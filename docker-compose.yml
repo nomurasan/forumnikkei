@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: forum-nikkei-app
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mapeia a pasta local "./data" da VPS para dentro do container (/app/data).
+      # Isso garante que as respostas salvas em "respostas.json" nunca sejam perdidas.
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=production
+      # - GEMINI_API_KEY=sua_chave_aqui # Caso utilize recursos de IA no futuro
