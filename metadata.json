@@ -1,0 +1,8 @@
+{
+  "name": "Coleta de Aprendizados - Fórum Nikkei Brasil-Japão",
+  "description": "Formulário estruturado para coleta de aprendizados, percepções e oportunidades do Fórum Empresarial Nikkei Brasil-Japão.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
