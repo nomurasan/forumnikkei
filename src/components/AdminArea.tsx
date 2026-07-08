@@ -228,17 +228,26 @@ export default function AdminArea() {
     }
   };
 
-  // Fetch all form responses from server (local synced API)
+  // Fetch all form responses directly from Firestore
   const fetchSubmissions = async () => {
     setDataLoading(true);
     try {
-      const res = await fetch("/api/respostas");
-      const result = await res.json();
-      if (result.success) {
-        setSubmissions(result.data);
-      }
+      const snap = await getDocs(collection(db, "forum_nikkei_respostas"));
+      const list: any[] = [];
+      snap.forEach((docSnap) => {
+        list.push({
+          id: docSnap.id,
+          ...docSnap.data()
+        });
+      });
+      setSubmissions(list.sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      }));
     } catch (err) {
-      console.error("Erro ao buscar respostas:", err);
+      console.error("Erro ao buscar respostas no Firebase:", err);
+      alert("Não foi possível recuperar os usuários do Firebase. Verifique as permissões do Firestore e tente novamente.");
     } finally {
       setDataLoading(false);
     }
@@ -460,6 +469,14 @@ export default function AdminArea() {
     }
 
     try {
+      await deleteDoc(doc(db, "forum_nikkei_respostas", id));
+      setSubmissions(prev => prev.filter(s => s.id !== id));
+      if (selectedSubmission?.id === id) {
+        setSelectedSubmission(null);
+      }
+      alert("Participante excluído com sucesso.");
+      return;
+
       const res = await fetch(`/api/respostas/${id}`, {
         method: "DELETE"
       });
@@ -491,6 +508,13 @@ export default function AdminArea() {
     };
 
     try {
+      await setDoc(doc(db, "forum_nikkei_respostas", selectedSubmission.id), updates, { merge: true });
+      setSubmissions(prev => prev.map(s => s.id === selectedSubmission.id ? { ...s, ...updates } : s));
+      setSelectedSubmission(prev => ({ ...prev, ...updates }));
+      setIsEditingAdminFields(false);
+      alert("Campos de análise atualizados com sucesso!");
+      return;
+
       const res = await fetch(`/api/respostas/${selectedSubmission.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -514,7 +538,27 @@ export default function AdminArea() {
 
   // Quick helper to export formatted CSV
   const handleExportCSV = () => {
-    window.open("/api/export-csv", "_blank");
+    const data = filteredSubmissions.length ? filteredSubmissions : submissions;
+    const headers = ["nome", "email", "cargo", "cidade", "pais", "avaliacaoGeral", "statusAnalise", "destaqueRelatorio", "createdAt"];
+    const escapeCSVValue = (value: any) => {
+      if (value === null || value === undefined) return "";
+      const stringValue = Array.isArray(value) ? value.join("; ") : String(value);
+      const escaped = stringValue.replace(/"/g, '""');
+      return /[",;\n\r]/.test(escaped) ? `"${escaped}"` : escaped;
+    };
+    const csv = [
+      "\uFEFF" + headers.join(";"),
+      ...data.map((row) => headers.map((header) => escapeCSVValue(row[header])).join(";"))
+    ].join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const downloadAnchor = document.createElement("a");
+    downloadAnchor.href = url;
+    downloadAnchor.download = `forum_nikkei_firebase_${Date.now()}.csv`;
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    URL.revokeObjectURL(url);
   };
 
   // Quick helper to export JSON
@@ -639,6 +683,13 @@ export default function AdminArea() {
   const handleToggleHighlightDirect = async (sub: any) => {
     const updatedStatus = !sub.destaqueRelatorio;
     try {
+      await setDoc(doc(db, "forum_nikkei_respostas", sub.id), { destaqueRelatorio: updatedStatus }, { merge: true });
+      setSubmissions(prev => prev.map(s => s.id === sub.id ? { ...s, destaqueRelatorio: updatedStatus } : s));
+      if (selectedSubmission?.id === sub.id) {
+        setSelectedSubmission(prev => ({ ...prev, destaqueRelatorio: updatedStatus }));
+      }
+      return;
+
       const res = await fetch(`/api/respostas/${sub.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -749,16 +800,16 @@ export default function AdminArea() {
     .sort((a, b) => b.mapped - a.mapped || a.name.localeCompare(b.name));
 
   const selectedCompany = companies.find((company) => company.name === selectedCompanyName) || companies[0];
-  const selectedCollaborators = selectedCompany ? selectedCompany.collaborators : [];
-  const visibleCollaborators = showCompanyCollaborators
-    ? selectedCollaborators.filter((sub) => {
-        const term = searchTerm.toLowerCase();
-        return !term ||
-          sub.nome?.toLowerCase().includes(term) ||
-          sub.email?.toLowerCase().includes(term) ||
-          sub.cargo?.toLowerCase().includes(term);
-      })
-    : [];
+  const selectedCollaborators = submissions;
+  const visibleCollaborators = submissions.filter((sub) => {
+    const term = searchTerm.toLowerCase();
+    return !term ||
+      sub.nome?.toLowerCase().includes(term) ||
+      sub.email?.toLowerCase().includes(term) ||
+      sub.cargo?.toLowerCase().includes(term) ||
+      sub.cidade?.toLowerCase().includes(term) ||
+      sub.pais?.toLowerCase().includes(term);
+  });
 
   const clearCompanySelection = () => {
     setSelectedCompanyName("");
@@ -948,6 +999,9 @@ export default function AdminArea() {
     <div className="w-full max-w-6xl mx-auto space-y-8 py-2" id="admin-company-workspace">
       <div className="flex flex-col gap-2">
         <p className="max-w-2xl text-[13px] leading-relaxed text-slate-600">
+          Consulte os usuários recuperados do Firebase, gerencie novos acessos e faça correções pontuais nos perfis e respostas dos colaboradores.
+        </p>
+        <p className="hidden">
           Configure as empresas parceiras do Fórum, gerencie novos acessos e faça correções pontuais nos perfis e respostas dos colaboradores.
         </p>
         <div className="flex flex-wrap items-center gap-2 pt-2">
@@ -981,7 +1035,23 @@ export default function AdminArea() {
         </div>
       ) : (
         <>
-          <section className="space-y-4" id="admin-companies-section">
+          <section className="grid gap-4 sm:grid-cols-3" id="admin-firebase-summary">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Usuários no Firebase</span>
+              <strong className="mt-2 block text-3xl font-black text-[#061f67]">{submissions.length}</strong>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Destacados</span>
+              <strong className="mt-2 block text-3xl font-black text-brand-red">{submissions.filter((sub) => sub.destaqueRelatorio).length}</strong>
+            </div>
+            <div className="rounded-2xl bg-[#14256f] p-5 text-white shadow-sm">
+              <span className="text-[10px] font-black uppercase tracking-wider text-white/60">Origem dos dados</span>
+              <strong className="mt-3 block text-sm font-black uppercase">Firestore</strong>
+              <span className="mt-1 block text-xs text-white/70">Coleção: forum_nikkei_respostas</span>
+            </div>
+          </section>
+
+          <section className="hidden" id="admin-companies-section">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="flex items-start gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-[#10246b]">
@@ -1103,7 +1173,7 @@ export default function AdminArea() {
                 </div>
                 <div>
                   <h2 className="text-sm font-black uppercase tracking-[0.08em] text-[#061f67]">
-                    Colaboradores de: <span className="text-brand-red">{selectedCompany?.name || "Selecione uma empresa"}</span> ({selectedCollaborators.length})
+                    Usuários recuperados do Firebase ({selectedCollaborators.length})
                   </h2>
                   <p className="max-w-xl text-sm font-semibold leading-relaxed text-slate-500">
                     Consulte os usuários vinculados para visualizar relatórios ou fazer adequações de perfil.
@@ -1112,10 +1182,10 @@ export default function AdminArea() {
               </div>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <button
-                  onClick={() => setShowCompanyCollaborators(false)}
+                  onClick={() => setSearchTerm("")}
                   className="rounded-lg border border-slate-200 bg-white px-8 py-3 text-sm font-black uppercase tracking-wider text-brand-red transition-colors hover:bg-red-50"
                 >
-                  × Fechar lista
+                  Limpar busca
                 </button>
                 <div className="relative min-w-[260px] sm:min-w-[360px]">
                   <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -1135,20 +1205,14 @@ export default function AdminArea() {
                   <thead>
                     <tr className="border-b border-slate-900/90 bg-slate-50 text-[10px] font-black uppercase tracking-wider text-[#061f67]">
                       <th className="px-4 py-4">Colaborador / E-mail</th>
-                      <th className="px-4 py-4">Empresa / Turma</th>
+                      <th className="px-4 py-4">Localidade</th>
                       <th className="px-4 py-4">Perfil dominante</th>
                       <th className="px-4 py-4">Função</th>
                       <th className="px-4 py-4 text-right">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-xs">
-                    {!showCompanyCollaborators ? (
-                      <tr>
-                        <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
-                          Lista oculta. Selecione "Mostrar colaboradores" no card da empresa para visualizar.
-                        </td>
-                      </tr>
-                    ) : visibleCollaborators.length === 0 ? (
+                    {visibleCollaborators.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
                           Nenhum colaborador encontrado para a seleção atual.
@@ -1162,8 +1226,8 @@ export default function AdminArea() {
                             <span className="mt-1 block font-mono text-[11px] text-slate-500">{sub.email}</span>
                           </td>
                           <td className="px-4 py-5">
-                            <span className="block font-bold text-slate-800">{sub.empresaInstituicao || selectedCompany?.name}</span>
-                            <span className="mt-2 block h-3 w-3 rounded bg-red-50" />
+                            <span className="block font-bold text-slate-800">{[sub.cidade, sub.pais].filter(Boolean).join(", ") || "Não informado"}</span>
+                            <span className="mt-1 block text-[10px] font-mono text-slate-400">Firebase</span>
                           </td>
                           <td className="px-4 py-5">
                             <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase text-emerald-700">
