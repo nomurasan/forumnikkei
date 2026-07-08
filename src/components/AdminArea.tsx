@@ -20,7 +20,8 @@ import {
   query,
   orderBy,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  signInWithRedirect
 } from "../lib/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { 

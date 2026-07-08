@@ -26,7 +26,8 @@ import {
   onAuthStateChanged,
   User as FirebaseUser,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  signInWithRedirect
 } from "firebase/auth";
 
 import firebaseConfig from "../../firebase-applet-config.json";
@@ -56,6 +57,7 @@ export {
   signOut,
   onAuthStateChanged,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  signInWithRedirect
 };
 export type { FirebaseUser };
