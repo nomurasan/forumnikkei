@@ -913,6 +913,376 @@ export default function AdminArea() {
   }
 
   return (
+    <div className="w-full max-w-6xl mx-auto space-y-8 py-2" id="admin-company-workspace">
+      <div className="flex flex-col gap-2">
+        <p className="max-w-2xl text-[13px] leading-relaxed text-slate-600">
+          Configure as empresas parceiras do Fórum, gerencie novos acessos e faça correções pontuais nos perfis e respostas dos colaboradores.
+        </p>
+        <div className="flex flex-wrap items-center gap-2 pt-2">
+          <button
+            onClick={fetchSubmissions}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-black uppercase tracking-wider text-slate-600 transition-colors hover:bg-slate-50"
+          >
+            Atualizar dados
+          </button>
+          <button
+            onClick={handleExportCSV}
+            className="inline-flex items-center gap-2 rounded-lg bg-[#14256f] px-3 py-2 text-[11px] font-black uppercase tracking-wider text-white transition-colors hover:bg-[#0d1a52]"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Exportar CSV
+          </button>
+          <button
+            onClick={handleLogout}
+            className="inline-flex items-center gap-2 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-[11px] font-black uppercase tracking-wider text-brand-red transition-colors hover:bg-red-100"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            Sair
+          </button>
+        </div>
+      </div>
+
+      {dataLoading ? (
+        <div className="flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white">
+          <div className="h-10 w-10 rounded-full border-4 border-brand-red/20 border-t-brand-red animate-spin" />
+          <p className="mt-4 text-xs font-black uppercase tracking-wider text-slate-400">Atualizando banco de colaboradores...</p>
+        </div>
+      ) : (
+        <>
+          <section className="space-y-4" id="admin-companies-section">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-[#10246b]">
+                  <Building2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-black uppercase tracking-[0.08em] text-[#061f67]">
+                    Empresas & Turmas Cadastradas ({companies.length})
+                  </h2>
+                  <p className="text-sm text-slate-500">
+                    Selecione uma organização para filtrar o banco de colaboradores abaixo.
+                  </p>
+                </div>
+              </div>
+              {selectedCompany && (
+                <button
+                  onClick={clearCompanySelection}
+                  className="self-start text-sm font-black text-brand-red transition-colors hover:text-brand-red-hover md:self-auto"
+                >
+                  Limpar Filtro de Seleção ×
+                </button>
+              )}
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-[minmax(260px,1fr)_390px]">
+              <button
+                type="button"
+                className="flex min-h-[260px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white/60 p-8 text-center transition-colors hover:border-brand-red/30 hover:bg-red-50/20"
+                onClick={() => alert("Cadastro manual de empresas ainda não está conectado. As empresas são criadas automaticamente pelas respostas enviadas.")}
+              >
+                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-brand-red">
+                  <Plus className="h-6 w-6" />
+                </span>
+                <span className="mt-5 text-sm font-black text-[#061f67]">Cadastrar Nova Empresa</span>
+                <span className="mt-2 text-xs text-slate-400">Clique para registrar uma nova organização</span>
+              </button>
+
+              <div className="space-y-4">
+                {companies.length === 0 ? (
+                  <div className="flex min-h-[260px] items-center justify-center rounded-2xl bg-[#14256f] p-6 text-center text-sm font-bold text-white">
+                    Nenhuma empresa cadastrada ainda.
+                  </div>
+                ) : (
+                  companies.slice(0, 3).map((company) => {
+                    const isSelected = selectedCompany?.name === company.name;
+                    return (
+                      <article
+                        key={company.name}
+                        className={`rounded-2xl bg-[#14256f] p-6 text-white shadow-xl transition-all ${isSelected ? "ring-4 ring-[#14256f]/15" : "opacity-95 hover:opacity-100"}`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedCompanyName(company.name);
+                              setShowCompanyCollaborators(true);
+                            }}
+                            className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/12 text-white"
+                            title="Selecionar empresa"
+                          >
+                            <Building2 className="h-5 w-5" />
+                          </button>
+                          <div className="flex items-center gap-3 text-white/75">
+                            <button type="button" onClick={() => setActiveTab("config")} title="Configurações">
+                              <Settings className="h-4 w-4" />
+                            </button>
+                            {adminProfile.perfil === "admin_master" && (
+                              <button type="button" onClick={() => alert("Exclua colaboradores individualmente na lista abaixo.")} title="Excluir empresa">
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="mt-5">
+                          <h3 className="text-sm font-black">{company.name}</h3>
+                          <span className="mt-2 inline-flex rounded bg-white/10 px-2 py-1 text-[10px] font-black">{company.mapped}</span>
+                        </div>
+
+                        <div className="mt-7 flex flex-wrap gap-x-7 gap-y-2 text-base font-black">
+                          <span>Mapeados : {company.mapped}</span>
+                          <span>Respondido : {company.responded}</span>
+                        </div>
+
+                        <div className="mt-5 space-y-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedCompanyName(company.name);
+                              setShowCompanyCollaborators((current) => selectedCompany?.name === company.name ? !current : true);
+                            }}
+                            className="flex w-full items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 text-sm font-black uppercase tracking-wide text-[#061f67] transition-colors hover:bg-slate-100"
+                          >
+                            {isSelected && showCompanyCollaborators ? "Ocultar colaboradores" : "Mostrar colaboradores"}
+                            <ChevronRight className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab("graficos")}
+                            className="flex w-full items-center justify-center gap-3 rounded-lg bg-white/12 px-4 py-3 text-sm font-black uppercase tracking-wide text-white transition-colors hover:bg-white/18"
+                          >
+                            <LayoutDashboard className="h-4 w-4" />
+                            Visualizar dashboard da empresa
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-8" id="admin-collaborators-section">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-brand-red">
+                  <Users className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-black uppercase tracking-[0.08em] text-[#061f67]">
+                    Colaboradores de: <span className="text-brand-red">{selectedCompany?.name || "Selecione uma empresa"}</span> ({selectedCollaborators.length})
+                  </h2>
+                  <p className="max-w-xl text-sm font-semibold leading-relaxed text-slate-500">
+                    Consulte os usuários vinculados para visualizar relatórios ou fazer adequações de perfil.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <button
+                  onClick={() => setShowCompanyCollaborators(false)}
+                  className="rounded-lg border border-slate-200 bg-white px-8 py-3 text-sm font-black uppercase tracking-wider text-brand-red transition-colors hover:bg-red-50"
+                >
+                  × Fechar lista
+                </button>
+                <div className="relative min-w-[260px] sm:min-w-[360px]">
+                  <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="Pesquisar por nome ou e-mail..."
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-xs text-slate-600 outline-none transition focus:border-[#14256f] focus:bg-white focus:ring-2 focus:ring-[#14256f]/10"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-7 overflow-hidden rounded-lg border border-slate-900/90">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px] border-collapse text-left">
+                  <thead>
+                    <tr className="border-b border-slate-900/90 bg-slate-50 text-[10px] font-black uppercase tracking-wider text-[#061f67]">
+                      <th className="px-4 py-4">Colaborador / E-mail</th>
+                      <th className="px-4 py-4">Empresa / Turma</th>
+                      <th className="px-4 py-4">Perfil dominante</th>
+                      <th className="px-4 py-4">Função</th>
+                      <th className="px-4 py-4 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs">
+                    {!showCompanyCollaborators ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
+                          Lista oculta. Selecione "Mostrar colaboradores" no card da empresa para visualizar.
+                        </td>
+                      </tr>
+                    ) : visibleCollaborators.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
+                          Nenhum colaborador encontrado para a seleção atual.
+                        </td>
+                      </tr>
+                    ) : (
+                      visibleCollaborators.map((sub) => (
+                        <tr key={sub.id} className="align-top transition-colors hover:bg-slate-50/80">
+                          <td className="px-4 py-5">
+                            <span className="block font-black text-[#061f67]">{sub.nome || "Sem nome"}</span>
+                            <span className="mt-1 block font-mono text-[11px] text-slate-500">{sub.email}</span>
+                          </td>
+                          <td className="px-4 py-5">
+                            <span className="block font-bold text-slate-800">{sub.empresaInstituicao || selectedCompany?.name}</span>
+                            <span className="mt-2 block h-3 w-3 rounded bg-red-50" />
+                          </td>
+                          <td className="px-4 py-5">
+                            <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase text-emerald-700">
+                              {getDominantProfile(sub)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-5">
+                            <span className="inline-flex rounded-md bg-slate-100 px-3 py-1 text-[10px] font-black uppercase text-[#061f67]">
+                              {sub.cargo || "Colaborador"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-5 text-right">
+                            <div className="flex flex-wrap items-start justify-end gap-2">
+                              <button
+                                onClick={() => openEditAdminFields(sub)}
+                                className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-3 py-2 text-[11px] font-black text-[#061f67] transition-colors hover:bg-slate-200"
+                              >
+                                <Search className="h-3.5 w-3.5" />
+                                Ver Último
+                              </button>
+                              <button
+                                onClick={() => handleToggleHighlightDirect(sub)}
+                                className={`rounded-lg border px-3 py-2 text-[11px] font-black transition-colors ${
+                                  sub.destaqueRelatorio
+                                    ? "border-amber-200 bg-amber-50 text-amber-700"
+                                    : "border-[#061f67]/20 bg-white text-[#061f67] hover:bg-slate-50"
+                                }`}
+                                title="Marcar como destaque"
+                              >
+                                <Shield className="h-3.5 w-3.5" />
+                              </button>
+                              {adminProfile.perfil === "admin_master" && (
+                                <button
+                                  onClick={() => handleDeleteSubmission(sub.id)}
+                                  className="rounded-lg bg-red-50 px-3 py-2 text-brand-red transition-colors hover:bg-red-100"
+                                  title="Excluir colaborador"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                              <div className="basis-full text-right text-[10px] text-slate-400">
+                                Histórico de tentativas (1):
+                                <button className="ml-2 rounded border border-slate-900 px-2 py-1 text-[10px] font-bold text-[#061f67]">
+                                  T. Recente ({sub.createdAt ? new Date(sub.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "--/--"})
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        </>
+      )}
+
+      {selectedSubmission && isEditingAdminFields && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/60 p-4">
+          <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-100 p-6">
+              <div>
+                <span className="rounded bg-red-50 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-brand-red">
+                  Curadoria do colaborador
+                </span>
+                <h3 className="mt-2 text-xl font-black text-[#061f67]">{selectedSubmission.nome}</h3>
+                <p className="text-sm text-slate-500">{selectedSubmission.email} • {selectedSubmission.empresaInstituicao}</p>
+              </div>
+              <button onClick={() => setIsEditingAdminFields(false)} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="max-h-[68vh] space-y-5 overflow-y-auto p-6">
+              <div className="grid gap-4 md:grid-cols-3">
+                <label className="space-y-1 text-xs font-black uppercase tracking-wider text-slate-500">
+                  Status
+                  <select
+                    value={statusAnalise}
+                    onChange={(event) => setStatusAnalise(event.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium normal-case tracking-normal text-slate-700"
+                  >
+                    <option value="pendente">Pendente</option>
+                    <option value="em análise">Em análise</option>
+                    <option value="analisado">Analisado</option>
+                    <option value="selecionado para relatório">Destaque relatório</option>
+                    <option value="descartado">Descartado</option>
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setDestaqueRelatorio(!destaqueRelatorio)}
+                  className={`self-end rounded-lg border px-3 py-2 text-xs font-black uppercase ${
+                    destaqueRelatorio ? "border-amber-200 bg-amber-50 text-amber-700" : "border-slate-200 bg-white text-slate-500"
+                  }`}
+                >
+                  {destaqueRelatorio ? "Destacado" : "Não destacado"}
+                </button>
+                <div className="self-end rounded-lg bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">
+                  Nota geral: <span className="text-[#061f67]">{selectedSubmission.avaliacaoGeral || "-"}</span>
+                </div>
+              </div>
+
+              <label className="block space-y-1 text-xs font-black uppercase tracking-wider text-slate-500">
+                Observações internas
+                <textarea
+                  value={adminNote}
+                  onChange={(event) => setAdminNote(event.target.value)}
+                  rows={3}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium normal-case leading-relaxed tracking-normal text-slate-700"
+                  placeholder="Anotações da equipe administrativa..."
+                />
+              </label>
+
+              <div className="grid gap-4 text-sm md:grid-cols-2">
+                <div className="rounded-lg bg-slate-50 p-4">
+                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">Função</span>
+                  <p className="mt-1 font-bold text-slate-800">{selectedSubmission.cargo || "Não informado"}</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-4">
+                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">Local</span>
+                  <p className="mt-1 font-bold text-slate-800">{selectedSubmission.cidade}, {selectedSubmission.pais}</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-4 md:col-span-2">
+                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">Destaque do Fórum</span>
+                  <p className="mt-1 leading-relaxed text-slate-700">{selectedSubmission.destaqueForum || "Sem resposta registrada."}</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-4 md:col-span-2">
+                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">Reflexão final</span>
+                  <p className="mt-1 leading-relaxed text-slate-700">{selectedSubmission.reflexaoFinal || "Sem resposta registrada."}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-slate-100 p-5">
+              <button onClick={() => setIsEditingAdminFields(false)} className="rounded-lg bg-slate-100 px-4 py-2 text-xs font-black uppercase text-slate-600">
+                Fechar
+              </button>
+              <button onClick={handleSaveAdminFields} className="rounded-lg bg-brand-red px-5 py-2 text-xs font-black uppercase text-white">
+                Salvar Curadoria
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
     <div className="w-full bg-white border border-neutral-200/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row min-h-[700px]" id="admin-main-panel">
       
       {/* ADMIN ASIDE NAVIGATION */}
