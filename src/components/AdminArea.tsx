@@ -92,6 +92,8 @@ export default function AdminArea() {
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<"dashboard" | "participantes" | "graficos" | "qualitativa" | "config" | "usuarios">("dashboard");
   const [dataLoading, setDataLoading] = useState(false);
+  const [selectedCompanyName, setSelectedCompanyName] = useState("");
+  const [showCompanyCollaborators, setShowCompanyCollaborators] = useState(true);
 
   // Administrative users management state
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
@@ -686,6 +688,51 @@ export default function AdminArea() {
   })).sort((a, b) => b.quantidade - a.quantidade);
 
   const COLORS = ["#D2232A", "#1D4ED8", "#059669", "#D97706", "#7C3AED", "#DB2777", "#4B5563", "#06B6D4"];
+
+  const getDominantProfile = (sub: any) => {
+    const score = Number(sub.avaliacaoGeral) || 0;
+    if (score >= 9) return `PARTICIPATIVO (${score}PTS)`;
+    if (score >= 7) return `INTEGRADOR (${score}PTS)`;
+    if (score > 0) return `EM DESENVOLVIMENTO (${score}PTS)`;
+    return "PENDENTE";
+  };
+
+  const companyGroups = submissions.reduce((acc: Record<string, any[]>, sub) => {
+    const companyName = sub.empresaInstituicao?.trim() || "Sem empresa";
+    if (!acc[companyName]) acc[companyName] = [];
+    acc[companyName].push(sub);
+    return acc;
+  }, {});
+
+  const companies = Object.entries(companyGroups)
+    .map(([name, collaborators]) => ({
+      name,
+      collaborators,
+      mapped: collaborators.length,
+      responded: collaborators.filter((sub) => sub.email || sub.createdAt).length,
+      avgScore: collaborators.length
+        ? collaborators.reduce((acc, sub) => acc + (Number(sub.avaliacaoGeral) || 0), 0) / collaborators.length
+        : 0
+    }))
+    .sort((a, b) => b.mapped - a.mapped || a.name.localeCompare(b.name));
+
+  const selectedCompany = companies.find((company) => company.name === selectedCompanyName) || companies[0];
+  const selectedCollaborators = selectedCompany ? selectedCompany.collaborators : [];
+  const visibleCollaborators = showCompanyCollaborators
+    ? selectedCollaborators.filter((sub) => {
+        const term = searchTerm.toLowerCase();
+        return !term ||
+          sub.nome?.toLowerCase().includes(term) ||
+          sub.email?.toLowerCase().includes(term) ||
+          sub.cargo?.toLowerCase().includes(term);
+      })
+    : [];
+
+  const clearCompanySelection = () => {
+    setSelectedCompanyName("");
+    setShowCompanyCollaborators(false);
+    setSearchTerm("");
+  };
 
   // Loading Screen
   if (loading) {
