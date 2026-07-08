@@ -1,0 +1,59 @@
+{
+  "collections": {
+    "admin_users": {
+      "description": "Lista de usuários autorizados a acessar o painel administrativo",
+      "schema": {
+        "uid": { "type": "string" },
+        "nome": { "type": "string" },
+        "email": { "type": "string" },
+        "perfil": { "type": "string" },
+        "ativo": { "type": "boolean" },
+        "createdAt": { "type": "timestamp" }
+      }
+    },
+    "forum_nikkei_respostas": {
+      "description": "Respostas coletadas do formulário do Fórum Empresarial Nikkei",
+      "schema": {
+        "id": { "type": "string" },
+        "nome": { "type": "string" },
+        "email": { "type": "string" },
+        "empresaInstituicao": { "type": "string" },
+        "cargo": { "type": "string" },
+        "cidade": { "type": "string" },
+        "pais": { "type": "string" },
+        "avaliacaoGeral": { "type": "number" },
+        "atividadeMaiorValor": { "type": "string" },
+        "destaqueForum": { "type": "string" },
+        "tresAprendizados": { "type": "string" },
+        "ideiaMaisImpactante": { "type": "string" },
+        "aspectoCulturaJaponesa": { "type": "string" },
+        "praticaPretendeAplicar": { "type": "string" },
+        "pretendeAplicarConhecimento": { "type": "string" },
+        "qualConhecimentoAplicar": { "type": "string" },
+        "desafiosImplementacao": { "type": "string" },
+        "oportunidadesBrasilJapao": { "type": "string" },
+        "comoRenPodeContribuir": { "type": "string" },
+        "oportunidadesAmericaLatina": { "type": "string" },
+        "projetoColaborativo": { "type": "string" },
+        "estabeleceuNovosContatos": { "type": "string" },
+        "contatosPodemGerarParcerias": { "type": "string" },
+        "temasPrioritarios": { "type": "array", "items": { "type": "string" } },
+        "naoPodeFaltar": { "type": "string" },
+        "pontosAprimorar": { "type": "string" },
+        "reflexaoFinal": { "type": "string" },
+        "recomendacaoRenBrasil": { "type": "string" },
+        "visao2035": { "type": "string" },
+        "inovacaoProximaEdicao": { "type": "string" },
+        "mensagemLegado": { "type": "string" },
+        "createdAt": { "type": "timestamp" },
+        "updatedAt": { "type": "timestamp" },
+        "origem": { "type": "string" },
+        "evento": { "type": "string" },
+        "adminTags": { "type": "array", "items": { "type": "string" } },
+        "destaqueRelatorio": { "type": "boolean" },
+        "observacaoAdmin": { "type": "string" },
+        "statusAnalise": { "type": "string" }
+      }
+    }
+  }
+}

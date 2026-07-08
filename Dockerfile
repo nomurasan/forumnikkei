@@ -9,7 +9,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Instala todas as dependências (incluindo as de desenvolvimento)
-RUN npm ci
+RUN npm install
 
 # Copia o restante do código da aplicação
 COPY . .
@@ -31,7 +31,7 @@ ENV NODE_ENV=production
 COPY package*.json ./
 
 # Instala apenas as dependências de produção para manter a imagem leve
-RUN npm ci --omit=dev
+RUN npm install --omit=dev
 
 # Copia os arquivos compilados do estágio anterior
 COPY --from=builder /app/dist ./dist

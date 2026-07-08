@@ -1,0 +1,39 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if the user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user has active admin profile
+    function isAdmin() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/admin_users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/admin_users/$(request.auth.uid)).data.ativo == true;
+    }
+
+    // Helper function to check if user is admin master
+    function isAdminMaster() {
+      return isAdmin() && 
+        get(/databases/$(database)/documents/admin_users/$(request.auth.uid)).data.perfil == "admin_master";
+    }
+
+    // Security rules for admin_users collection
+    match /admin_users/{userId} {
+      allow read: if isAdmin() || 
+                    (isAuthenticated() && request.auth.uid == userId) || 
+                    (isAuthenticated() && request.auth.token != null && userId == "email_" + request.auth.token.email);
+      allow write: if isAdminMaster() || (!exists(/databases/$(database)/documents/admin_users/$(userId)) && isAuthenticated() && request.auth.uid == userId);
+    }
+
+    // Security rules for forum_nikkei_respostas collection
+    match /forum_nikkei_respostas/{responseId} {
+      // Anyone can create a response, but only admins can read or write
+      allow create: if true;
+      allow read, update: if isAdmin();
+      allow delete: if isAdminMaster();
+    }
+  }
+}

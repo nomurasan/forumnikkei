@@ -40,6 +40,7 @@ import WelcomeScreen from "./components/WelcomeScreen";
 import ReviewScreen from "./components/ReviewScreen";
 import SuccessScreen from "./components/SuccessScreen";
 import Logo from "./components/Logo";
+import AdminArea from "./components/AdminArea";
 
 export default function App() {
   const [step, setStep] = useState<number>(1);
@@ -49,6 +50,17 @@ export default function App() {
   const [hasDraft, setHasDraft] = useState<boolean>(false);
   const [draftData, setDraftData] = useState<FormResponse | null>(null);
   const [submitMessage, setSubmitMessage] = useState<string>("");
+
+  const [isAdminMode, setIsAdminMode] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      setIsAdminMode(window.location.hash.startsWith("#/admin"));
+    };
+    window.addEventListener("hashchange", handleHashChange);
+    handleHashChange(); // initial check
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
 
   // Step names corresponding to stages 1 to 10
   const stepNames = [
@@ -270,6 +282,52 @@ export default function App() {
     }
     handleFieldChange("temasPrioritarios", updated);
   };
+
+  if (isAdminMode) {
+    return (
+      <div className="min-h-screen bg-neutral-50 text-neutral-800 flex flex-col font-sans" id="admin-root">
+        <header className="bg-white border-b border-neutral-200/80 py-3 px-6 sticky top-0 z-40 shadow-xs" id="admin-header">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Logo variant="horizontal" className="h-10" />
+              <div className="h-8 w-[1px] bg-neutral-200 hidden md:block" />
+              <div className="hidden md:flex flex-col">
+                <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-brand-red leading-tight">
+                  Fórum Empresarial Nikkei Brasil–Japão
+                </span>
+                <h1 className="text-xs font-display font-bold text-neutral-500 tracking-tight">
+                  Painel Administrativo & Curadoria 2026
+                </h1>
+              </div>
+            </div>
+            <div className="hidden sm:flex items-center gap-2 bg-neutral-50 border border-neutral-200/60 rounded-full px-3 py-1.5 text-[10px] text-neutral-500 font-mono font-bold uppercase tracking-wider">
+              <span className="w-2 h-2 rounded-full bg-brand-red animate-pulse" />
+              Área Protegida
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col justify-center">
+          <AdminArea />
+        </main>
+
+        <footer className="bg-white border-t border-neutral-200/80 py-6 px-6 text-center text-xs text-neutral-500 font-sans" id="admin-footer">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="flex items-center justify-center gap-1.5">
+              Desenvolvido com <Heart className="w-4 h-4 text-brand-red fill-brand-red/20" /> para o Fórum Empresarial Nikkei Brasil–Japão.
+            </p>
+            <div className="flex items-center gap-4 text-neutral-400 font-mono font-bold uppercase tracking-wider text-[10px]">
+              <span>Rede Nikkei (REN Brasil)</span>
+              <span>•</span>
+              <a href="#" className="hover:text-brand-red font-bold transition-colors">Voltar ao Formulário</a>
+              <span>•</span>
+              <span>Versão 1.2.0</span>
+            </div>
+          </div>
+        </footer>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-800 flex flex-col font-sans" id="app-root">
@@ -1208,6 +1266,8 @@ export default function App() {
         </p>
         <div className="flex items-center gap-4 text-neutral-400 font-mono font-bold uppercase tracking-wider text-[10px]">
           <span>Rede Nikkei (REN Brasil)</span>
+          <span>•</span>
+          <a href="#/admin" className="hover:text-brand-red font-bold transition-colors">Painel Admin</a>
           <span>•</span>
           <span>Versão 1.2.0</span>
         </div>

@@ -7,11 +7,54 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
+import { initializeApp as initFirebaseApp } from "firebase/app";
+import { 
+  getFirestore as initFirestore, 
+  doc as fsDoc, 
+  setDoc as fsSetDoc, 
+  deleteDoc as fsDeleteDoc 
+} from "firebase/firestore";
 
 const app = express();
 const PORT = 3000;
 const DATA_DIR = path.join(process.cwd(), "data");
 const DATA_FILE = path.join(DATA_DIR, "respostas.json");
+
+// Firebase setup on server
+let dbFirestore: any = null;
+try {
+  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+  if (fs.existsSync(configPath)) {
+    const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    const fbApp = initFirebaseApp(config);
+    dbFirestore = initFirestore(fbApp, config.firestoreDatabaseId || "(default)");
+    console.log("Firebase inicializado no servidor com sucesso.");
+  }
+} catch (err) {
+  console.error("Erro ao inicializar Firebase no servidor:", err);
+}
+
+// Function to sync local responses to Firestore on startup
+async function syncLocalToFirestore() {
+  if (!dbFirestore) return;
+  try {
+    const submissions = readSubmissions();
+    console.log(`[Sync] Sincronizando ${submissions.length} respostas locais com o Firestore...`);
+    for (const sub of submissions) {
+      const docRef = fsDoc(dbFirestore, "forum_nikkei_respostas", sub.id);
+      await fsSetDoc(docRef, {
+        ...sub,
+        adminTags: sub.adminTags || [],
+        destaqueRelatorio: sub.destaqueRelatorio || false,
+        observacaoAdmin: sub.observacaoAdmin || "",
+        statusAnalise: sub.statusAnalise || "pendente"
+      }, { merge: true });
+    }
+    console.log("[Sync] Sincronização concluída com sucesso.");
+  } catch (err) {
+    console.error("[Sync] Erro ao sincronizar respostas com Firestore:", err);
+  }
+}
 
 // Ensure data directory and file exist
 if (!fs.existsSync(DATA_DIR)) {
@@ -127,6 +170,74 @@ app.get("/api/respostas", (req, res) => {
   res.json({ success: true, count: submissions.length, data: submissions });
 });
 
+// PUT: Update admin fields for a response
+app.put("/api/respostas/:id", (req, res) => {
+  const id = req.params.id;
+  const updates = req.body;
+  const submissions = readSubmissions();
+  const index = submissions.findIndex(s => s.id === id);
+
+  if (index === -1) {
+    return res.status(404).json({ success: false, message: "Resposta não encontrada" });
+  }
+
+  const updatedSubmission = {
+    ...submissions[index],
+    ...updates,
+    updatedAt: new Date().toISOString()
+  };
+
+  submissions[index] = updatedSubmission;
+  const saved = writeSubmissions(submissions);
+
+  if (saved) {
+    if (dbFirestore) {
+      try {
+        const docRef = fsDoc(dbFirestore, "forum_nikkei_respostas", id);
+        fsSetDoc(docRef, updatedSubmission, { merge: true }).catch(err => {
+          console.error("Erro assíncrono ao atualizar Admin no Firestore:", err);
+        });
+      } catch (err) {
+        console.error("Erro síncrono ao atualizar Admin no Firestore:", err);
+      }
+    }
+
+    res.json({ success: true, message: "Campos de análise atualizados com sucesso!", data: updatedSubmission });
+  } else {
+    res.status(500).json({ success: false, message: "Erro ao salvar alterações localmente" });
+  }
+});
+
+// DELETE: Delete a response
+app.delete("/api/respostas/:id", (req, res) => {
+  const id = req.params.id;
+  const submissions = readSubmissions();
+  const index = submissions.findIndex(s => s.id === id);
+
+  if (index === -1) {
+    return res.status(404).json({ success: false, message: "Resposta não encontrada" });
+  }
+
+  submissions.splice(index, 1);
+  const saved = writeSubmissions(submissions);
+
+  if (saved) {
+    if (dbFirestore) {
+      try {
+        const docRef = fsDoc(dbFirestore, "forum_nikkei_respostas", id);
+        fsDeleteDoc(docRef).catch(err => {
+          console.error("Erro assíncrono ao excluir no Firestore:", err);
+        });
+      } catch (err) {
+        console.error("Erro ao excluir no Firestore:", err);
+      }
+    }
+    res.json({ success: true, message: "Resposta excluída com sucesso!" });
+  } else {
+    res.status(500).json({ success: false, message: "Erro ao excluir resposta localmente" });
+  }
+});
+
 // GET: Export as CSV
 app.get("/api/export-csv", (req, res) => {
   const submissions = readSubmissions();
@@ -179,6 +290,24 @@ app.post("/api/respostas", (req, res) => {
   const saved = writeSubmissions(submissions);
 
   if (saved) {
+    // Sincroniza com Firestore em segundo plano
+    if (dbFirestore) {
+      try {
+        const docRef = fsDoc(dbFirestore, "forum_nikkei_respostas", newSubmission.id);
+        fsSetDoc(docRef, {
+          ...newSubmission,
+          adminTags: newSubmission.adminTags || [],
+          destaqueRelatorio: newSubmission.destaqueRelatorio || false,
+          observacaoAdmin: newSubmission.observacaoAdmin || "",
+          statusAnalise: newSubmission.statusAnalise || "pendente"
+        }, { merge: true }).catch(err => {
+          console.error("Erro assíncrono ao salvar no Firestore:", err);
+        });
+      } catch (err) {
+        console.error("Erro síncrono ao salvar no Firestore:", err);
+      }
+    }
+
     res.json({
       success: true,
       message: existingIndex >= 0 ? "Sua resposta foi atualizada com sucesso!" : "Sua resposta foi enviada com sucesso!",
@@ -211,6 +340,7 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
+    syncLocalToFirestore();
   });
 }
 
