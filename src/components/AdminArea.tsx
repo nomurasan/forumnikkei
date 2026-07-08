@@ -364,11 +364,42 @@ export default function AdminArea() {
   const handleGoogleLogin = async () => {
     setAuthError("");
     setLoading(true);
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+
     try {
-      const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
     } catch (err: any) {
       console.error("Erro no login com Google:", err);
+      if (err.code === "auth/popup-blocked" || err.code === "auth/cancelled-popup-request") {
+        try {
+          await signInWithRedirect(auth, provider);
+          return;
+        } catch (redirectErr: any) {
+          console.error("Erro no redirecionamento do Google:", redirectErr);
+          setAuthError("O popup do Google foi bloqueado e o redirecionamento também falhou. Verifique bloqueadores de popup e tente novamente.");
+          setLoading(false);
+          return;
+        }
+      }
+
+      if (err.code === "auth/operation-not-allowed") {
+        setAuthError("Login com Google não está habilitado no Firebase Authentication. Ative o provedor Google no console do Firebase.");
+        setLoading(false);
+        return;
+      }
+
+      if (err.code === "auth/unauthorized-domain") {
+        setAuthError("Este domínio não está autorizado no Firebase Authentication. Adicione o domínio atual em Authentication > Settings > Authorized domains.");
+        setLoading(false);
+        return;
+      }
+
+      if (err.code === "auth/account-exists-with-different-credential") {
+        setAuthError("Este e-mail já existe com outro método de login. Entre com e-mail/senha ou vincule o provedor Google no Firebase.");
+        setLoading(false);
+        return;
+      }
       setAuthError("Erro na autenticação do Google: " + (err.message || err.code));
       setLoading(false);
     }
