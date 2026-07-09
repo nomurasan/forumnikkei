@@ -362,7 +362,7 @@ export default function AdminArea() {
           <p className="mt-2 text-lg font-black text-neutral-800">{topActivity}</p>
         </div>
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-          <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Média de probabilidade</p>
+          <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Média de chance de aplicar</p>
           <p className="mt-2 text-2xl font-black text-neutral-800">{averageProbability}</p>
         </div>
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
@@ -427,7 +427,7 @@ export default function AdminArea() {
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm xl:col-span-1">
           <div className="mb-3 flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-brand-red" />
-            <h3 className="text-sm font-black text-neutral-800">Probabilidade de aplicação</h3>
+            <h3 className="text-sm font-black text-neutral-800">Chance de aplicar</h3>
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -496,7 +496,7 @@ export default function AdminArea() {
               <tr className="border-b border-neutral-200 text-neutral-600">
                 <th className="py-2 pr-4">Atividade</th>
                 <th className="py-2 pr-4">Aprendizado</th>
-                <th className="py-2 pr-4">Probabilidade</th>
+                <th className="py-2 pr-4">Chance de aplicar</th>
                 <th className="py-2 pr-4">Iniciativa</th>
                 <th className="py-2 pr-4 text-right">Ações</th>
               </tr>
@@ -556,7 +556,7 @@ export default function AdminArea() {
             </div>
             <div className="rounded-xl bg-neutral-50 p-4">
               <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Aplicação</p>
-              <p className="mt-2 text-sm text-neutral-700">Probabilidade: {selectedSubmission.probabilidadeAplicacao ? `${selectedSubmission.probabilidadeAplicacao}/5` : "-"}</p>
+              <p className="mt-2 text-sm text-neutral-700">Chance de aplicar: {selectedSubmission.probabilidadeAplicacao ? `${selectedSubmission.probabilidadeAplicacao}/5` : "-"}</p>
               <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Prática: {selectedSubmission.praticaPretendeAplicar || "Sem resposta"}</p>
             </div>
             <div className="rounded-xl bg-neutral-50 p-4 md:col-span-2">
