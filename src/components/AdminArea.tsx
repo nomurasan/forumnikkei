@@ -164,6 +164,7 @@ export default function AdminArea() {
 
   const handleLogout = async () => {
     await signOut(auth);
+    window.location.href = window.location.origin + window.location.pathname;
   };
 
   const handleExportCSV = () => {
