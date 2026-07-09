@@ -7,9 +7,23 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Admin access is controlled by Google sign-in email.
+    function isGoogleSignIn() {
+      return isAuthenticated() &&
+        request.auth.token.firebase.sign_in_provider == "google.com";
+    }
+
+    function isAuthorizedAdminEmail() {
+      return isGoogleSignIn() &&
+        request.auth.token.email in [
+          "nomura.eduardo@gmail.com",
+          "nomura.yudas@gmail.com"
+        ];
+    }
+
     // Helper function to check if user has active admin profile
     function isAdmin() {
-      return isAuthenticated() && 
+      return isAuthorizedAdminEmail() &&
         exists(/databases/$(database)/documents/admin_users/$(request.auth.uid)) &&
         get(/databases/$(database)/documents/admin_users/$(request.auth.uid)).data.ativo == true;
     }
@@ -22,10 +36,16 @@ service cloud.firestore {
 
     // Security rules for admin_users collection
     match /admin_users/{userId} {
-      allow read: if isAdmin() || 
-                    (isAuthenticated() && request.auth.uid == userId) || 
-                    (isAuthenticated() && request.auth.token != null && userId == "email_" + request.auth.token.email);
-      allow write: if isAdminMaster() || (!exists(/databases/$(database)/documents/admin_users/$(userId)) && isAuthenticated() && request.auth.uid == userId);
+      allow read: if isAdmin() || (isAuthorizedAdminEmail() && request.auth.uid == userId);
+      allow create: if isAuthorizedAdminEmail() &&
+                    request.auth.uid == userId &&
+                    request.resource.data.uid == request.auth.uid &&
+                    request.resource.data.email in [
+                      "nomura.eduardo@gmail.com",
+                      "nomura.yudas@gmail.com"
+                    ] &&
+                    request.resource.data.ativo == true;
+      allow update, delete: if isAdminMaster();
     }
 
     // Security rules for forum_nikkei_respostas collection

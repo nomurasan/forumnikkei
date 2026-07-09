@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Compass, Lightbulb, Send, Sparkles, Star } from "lucide-react";
+import { ArrowLeft, ArrowRight, Compass, Lightbulb, Send, Shield, Sparkles, Star } from "lucide-react";
 import {
   DEFAULT_FORM_VALUES,
   FormResponse,
@@ -408,6 +408,16 @@ export default function App() {
 
         {step === 5 && <SuccessScreen data={formData} onReset={handleReset} />}
       </main>
+
+      <footer className="border-t border-neutral-200/80 bg-white px-4 py-4">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 text-xs text-neutral-500 sm:flex-row">
+          <span>Forum Empresarial Nikkei Brasil-Japao</span>
+          <a href="#/admin" className="inline-flex items-center gap-2 rounded-full border border-neutral-200 px-3 py-2 font-semibold text-neutral-600 hover:border-brand-red/40 hover:text-brand-red">
+            <Shield className="h-3.5 w-3.5" />
+            Acesso administrativo
+          </a>
+        </div>
+      </footer>
     </div>
   );
 }
