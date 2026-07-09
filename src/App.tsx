@@ -85,7 +85,8 @@ export default function App() {
   const [activeQuestion, setActiveQuestion] = useState(1);
 
   const stepNames = ["Apresentação", "Parte 1", "Parte 2", "Resumo", "Sucesso"];
-    const currentQuestionUsesChoice = [1, 3].includes(activeQuestion);
+  const currentQuestionUsesChoice = [1, 3].includes(activeQuestion);
+  const mainAlignmentClass = step === 1 ? "justify-center" : "justify-start";
 
   const getInitiativeSelections = (value: FormResponse["iniciativaPrioritariaREN"] | string) => {
     if (Array.isArray(value)) return value;
@@ -220,7 +221,6 @@ export default function App() {
       setStep(nextQuestion <= 3 ? 2 : 3);
     } else {
       setStep(4);
-      window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
@@ -263,6 +263,13 @@ export default function App() {
       document.getElementById(`question-${activeQuestion}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }, [activeQuestion, step]);
+
+  useEffect(() => {
+    if (step !== 4 && step !== 5) return;
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    });
+  }, [step]);
 
   const handlePrev = () => {
     if (step === 4) {
@@ -378,7 +385,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col justify-center">
+      <main className={`flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col ${mainAlignmentClass}`}>
         {step === 1 && <WelcomeScreen onStart={handleStart} hasDraft={hasDraft} draftData={draftData} />}
 
         {step > 1 && step < 5 && (
@@ -387,7 +394,9 @@ export default function App() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-brand-red">Fórum Empresarial Nikkei Brasil-Japão</p>
-                  <h2 className="text-lg font-display font-black text-neutral-800">{step === 2 ? "Parte 1 - Aprendizados e aplicação" : "Parte 2 - Recomendações estratégicas"}</h2>
+                  <h2 className="text-lg font-display font-black text-neutral-800">
+                    {step === 2 ? "Parte 1 - Aprendizados e aplicação" : step === 3 ? "Parte 2 - Recomendações estratégicas" : "Resumo das respostas"}
+                  </h2>
                 </div>
                 <div className="text-right text-xs text-neutral-500">
                   <div className="font-mono font-bold uppercase tracking-wider">Etapa {step - 1} de 3</div>
