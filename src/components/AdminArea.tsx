@@ -54,6 +54,9 @@ export default function AdminArea() {
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSubmission, setSelectedSubmission] = useState<any | null>(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -468,10 +471,22 @@ export default function AdminArea() {
             <Search className="h-4 w-4 text-brand-red" />
             <h3 className="text-sm font-black text-neutral-800">Respostas registradas</h3>
           </div>
-          <button type="button" onClick={handleExportCSV} className="inline-flex items-center gap-2 rounded-xl border border-neutral-300 px-3 py-2 text-sm font-semibold text-neutral-700">
-            <Download className="h-4 w-4" />
-            Gerar CSV
-          </button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button type="button" onClick={handleExportCSV} className="inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-300 px-3 py-2 text-sm font-semibold text-neutral-700">
+              <Download className="h-4 w-4" />
+              Gerar CSV
+            </button>
+            <button
+              type="button"
+              onClick={handleDeleteAllSubmissions}
+              disabled={!isAdminMaster || !submissions.length || isDeletingAll || !!deletingId}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+              title={isAdminMaster ? "Apagar todos os registros" : "Apenas admin_master pode apagar registros"}
+            >
+              <Trash2 className="h-4 w-4" />
+              {isDeletingAll ? "Apagando..." : "Apagar todos"}
+            </button>
+          </div>
         </div>
         {deleteError && <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{deleteError}</p>}
         <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Buscar por aprendizado, atividade ou iniciativa" className="mb-4 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm" />
@@ -483,6 +498,7 @@ export default function AdminArea() {
                 <th className="py-2 pr-4">Aprendizado</th>
                 <th className="py-2 pr-4">Probabilidade</th>
                 <th className="py-2 pr-4">Iniciativa</th>
+                <th className="py-2 pr-4 text-right">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -492,6 +508,20 @@ export default function AdminArea() {
                   <td className="py-3 pr-4">{item.principalAprendizado ? item.principalAprendizado.slice(0, 80) + (item.principalAprendizado.length > 80 ? "..." : "") : "-"}</td>
                   <td className="py-3 pr-4">{item.probabilidadeAplicacao ? `${item.probabilidadeAplicacao}/5` : "-"}</td>
                   <td className="py-3 pr-4">{formatDisplayValue(item.iniciativaPrioritariaREN) || "-"}</td>
+                  <td className="py-3 pr-4 text-right">
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleDeleteSubmission(item);
+                      }}
+                      disabled={!isAdminMaster || deletingId === item.id || isDeletingAll}
+                      className="inline-flex items-center justify-center rounded-lg border border-red-200 p-2 text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      title={isAdminMaster ? "Apagar registro" : "Apenas admin_master pode apagar registros"}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </td>
                 </tr>
               ))}
               {!filteredSubmissions.length && (
