@@ -18,6 +18,7 @@ import ReviewScreen from "./components/ReviewScreen";
 import SuccessScreen from "./components/SuccessScreen";
 import Logo from "./components/Logo";
 import AdminArea from "./components/AdminArea";
+import { db, doc, serverTimestamp, setDoc } from "./lib/firebase";
 
 interface ChatQuestionProps {
   number: number;
@@ -602,6 +603,7 @@ export default function App() {
     </div>
   );
 }
+
 
 
 
