@@ -6,7 +6,6 @@
 import React from "react";
 import { Play, RotateCcw, CheckSquare, Sparkles } from "lucide-react";
 import { FormResponse } from "../types";
-import Logo from "./Logo";
 
 interface WelcomeScreenProps {
   onStart: (resume: boolean) => void;
@@ -18,9 +17,11 @@ export default function WelcomeScreen({ onStart, hasDraft, draftData }: WelcomeS
   return (
     <div className="w-full max-w-3xl mx-auto bg-white border border-neutral-200/80 rounded-2xl shadow-2xl overflow-hidden" id="welcome-screen">
       <div className="relative bg-brand-dark text-white p-8 sm:p-10 text-center overflow-hidden border-b-4 border-brand-red">
-        <div className="bg-white px-8 py-6 rounded-2xl shadow-xl mb-6 inline-block">
-          <Logo variant="stacked" className="h-24 sm:h-28" />
-        </div>
+        <img
+          src="/forum-nikkei.png"
+          alt="Convite especial Conexao REN Global - Aprendizados da Experiencia Toyota"
+          className="mx-auto mb-6 w-full max-w-2xl rounded-2xl bg-white shadow-xl"
+        />
         <div className="relative inline-flex items-center gap-2 bg-white/10 px-4 py-1.5 rounded-full text-xs font-mono tracking-widest uppercase mb-4 border border-white/20 text-brand-gold">
           <Sparkles className="w-3.5 h-3.5 text-brand-gold" />
           Questionário do Fórum 2026
