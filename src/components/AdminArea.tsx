@@ -113,7 +113,7 @@ export default function AdminArea() {
   const fetchSubmissions = async () => {
     try {
       const snap = await getDocs(collection(db, "forum_nikkei_respostas"));
-      const data = snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+      const data: any[] = snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
       data.sort((a, b) => {
         const dateA = toMillis(a.createdAt);
         const dateB = toMillis(b.createdAt);
@@ -482,6 +482,4 @@ export default function AdminArea() {
     </div>
   );
 }
-
-
 
