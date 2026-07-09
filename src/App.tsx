@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -30,7 +30,7 @@ interface ChatQuestionProps {
 
 function ChatQuestion({ number, icon, question, helper, error, children }: ChatQuestionProps) {
   return (
-    <section className="space-y-3">
+    <section id={`question-${number}`} className="space-y-3 scroll-mt-28">
       <div className="flex items-start gap-3">
         <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-red text-white">
           <Bot className="h-4 w-4" />
@@ -83,15 +83,25 @@ export default function App() {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [activeQuestion, setActiveQuestion] = useState(1);
 
-  const stepNames = ["Apresentacao", "Parte 1", "Parte 2", "Resumo", "Sucesso"];
-  const currentQuestionUsesChoice = [1, 3, 5].includes(activeQuestion);
+  const stepNames = ["Apresentação", "Parte 1", "Parte 2", "Resumo", "Sucesso"];
+    const currentQuestionUsesChoice = [1, 3].includes(activeQuestion);
+
+  const getInitiativeSelections = (value: FormResponse["iniciativaPrioritariaREN"] | string) => {
+    if (Array.isArray(value)) return value;
+    return value ? [value] : [];
+  };
+
+  const formatResponseValue = (value: string | string[]) => {
+    if (Array.isArray(value)) return value.join("\n");
+    return value;
+  };
 
   const getFirstUnansweredQuestion = (data: FormResponse) => {
     if (!data.atividadeMaiorValor.trim()) return 1;
     if (!data.principalAprendizado.trim()) return 2;
     if (!data.probabilidadeAplicacao) return 3;
     if (!data.praticaPretendeAplicar.trim()) return 4;
-    if (!data.iniciativaPrioritariaREN.trim()) return 5;
+    if (getInitiativeSelections(data.iniciativaPrioritariaREN).length === 0) return 5;
     if (!data.recomendacaoEstrategicaREN.trim()) return 6;
     return 6;
   };
@@ -125,7 +135,7 @@ export default function App() {
       try {
         localStorage.setItem("forum_nikkei_draft", JSON.stringify(formData));
       } catch (e) {
-        console.warn("Nao foi possivel salvar o rascunho:", e);
+        console.warn("Não foi possível salvar o rascunho:", e);
       }
     }
   }, [formData, step]);
@@ -140,7 +150,7 @@ export default function App() {
       try {
         localStorage.removeItem("forum_nikkei_draft");
       } catch (e) {
-        console.warn("Nao foi possivel limpar o rascunho:", e);
+        console.warn("Não foi possível limpar o rascunho:", e);
       }
     }
     setActiveQuestion(nextQuestion);
@@ -170,7 +180,7 @@ export default function App() {
 
     if (questionNumber === 2) {
       if (!formData.principalAprendizado.trim()) {
-        currentErrors.principalAprendizado = "Este campo e obrigatorio.";
+        currentErrors.principalAprendizado = "Este campo é obrigatório.";
       }
     }
 
@@ -182,19 +192,19 @@ export default function App() {
 
     if (questionNumber === 4) {
       if (!formData.praticaPretendeAplicar.trim()) {
-        currentErrors.praticaPretendeAplicar = "Este campo e obrigatorio.";
+        currentErrors.praticaPretendeAplicar = "Este campo é obrigatório.";
       }
     }
 
     if (questionNumber === 5) {
-      if (!formData.iniciativaPrioritariaREN.trim()) {
-        currentErrors.iniciativaPrioritariaREN = "Selecione uma iniciativa prioritaria.";
+      if (getInitiativeSelections(formData.iniciativaPrioritariaREN).length === 0) {
+        currentErrors.iniciativaPrioritariaREN = "Selecione de 1 a 3 iniciativas prioritárias.";
       }
     }
 
     if (questionNumber === 6) {
       if (!formData.recomendacaoEstrategicaREN.trim()) {
-        currentErrors.recomendacaoEstrategicaREN = "Este campo e obrigatorio.";
+        currentErrors.recomendacaoEstrategicaREN = "Este campo é obrigatório.";
       }
     }
 
@@ -209,8 +219,8 @@ export default function App() {
       setStep(nextQuestion <= 3 ? 2 : 3);
     } else {
       setStep(4);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
-    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleChoiceAnswer = (field: keyof FormResponse, value: string | number, questionNumber: number) => {
@@ -218,11 +228,40 @@ export default function App() {
     window.setTimeout(() => moveAfterQuestion(questionNumber), 180);
   };
 
+  const handleInitiativeToggle = (value: string) => {
+    setFormData((prev) => {
+      const selected = getInitiativeSelections(prev.iniciativaPrioritariaREN);
+      const isSelected = selected.includes(value);
+      const nextSelected = isSelected
+        ? selected.filter((item) => item !== value)
+        : selected.length < 3
+          ? [...selected, value]
+          : selected;
+
+      return { ...prev, iniciativaPrioritariaREN: nextSelected };
+    });
+
+    if (errors.iniciativaPrioritariaREN) {
+      setErrors((prev) => {
+        const copy = { ...prev };
+        delete copy.iniciativaPrioritariaREN;
+        return copy;
+      });
+    }
+  };
+
   const handleNext = () => {
     if (step === 4) return;
     if (!validateQuestion(activeQuestion)) return;
     moveAfterQuestion(activeQuestion);
   };
+
+  useEffect(() => {
+    if (step <= 1 || step >= 4) return;
+    window.requestAnimationFrame(() => {
+      document.getElementById(`question-${activeQuestion}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [activeQuestion, step]);
 
   const handlePrev = () => {
     if (step === 4) {
@@ -259,7 +298,7 @@ export default function App() {
         try {
           localStorage.removeItem("forum_nikkei_draft");
         } catch (e) {
-          console.warn("Nao foi possivel limpar o rascunho:", e);
+          console.warn("Não foi possível limpar o rascunho:", e);
         }
         setStep(5);
       } else {
@@ -292,7 +331,7 @@ export default function App() {
               <div className="h-8 w-[1px] bg-neutral-200 hidden md:block" />
               <div className="hidden md:flex flex-col">
                 <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-brand-red leading-tight">
-                  Forum Empresarial Nikkei Brasil-Japao
+                  Fórum Empresarial Nikkei Brasil-Japão
                 </span>
                 <h1 className="text-xs font-display font-bold text-neutral-500 tracking-tight">
                   Painel Administrativo 2026
@@ -317,16 +356,16 @@ export default function App() {
             <div className="h-8 w-[1px] bg-neutral-200 hidden md:block" />
             <div className="hidden md:flex flex-col">
               <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-brand-red leading-tight">
-                Forum Empresarial Nikkei Brasil-Japao
+                Fórum Empresarial Nikkei Brasil-Japão
               </span>
               <h1 className="text-xs font-display font-bold text-neutral-500 tracking-tight">
-                Captura de aprendizados e recomendacoes
+                Captura de aprendizados e recomendações
               </h1>
             </div>
           </div>
           <div className="hidden sm:flex items-center gap-2 bg-neutral-50 border border-neutral-200/60 rounded-full px-3 py-1.5 text-[10px] text-neutral-500 font-mono font-bold uppercase tracking-wider">
             <span className="w-2 h-2 rounded-full bg-brand-red animate-pulse" />
-            Questionario 2026
+            Questionário 2026
           </div>
         </div>
       </header>
@@ -339,8 +378,8 @@ export default function App() {
             <div className="border-b border-neutral-100 bg-neutral-50/70 px-6 py-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-brand-red">Forum Empresarial Nikkei Brasil-Japao</p>
-                  <h2 className="text-lg font-display font-black text-neutral-800">{step === 2 ? "Parte 1 - Aprendizados e aplicacao" : "Parte 2 - Recomendacoes estrategicas"}</h2>
+                  <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-brand-red">Fórum Empresarial Nikkei Brasil-Japão</p>
+                  <h2 className="text-lg font-display font-black text-neutral-800">{step === 2 ? "Parte 1 - Aprendizados e aplicação" : "Parte 2 - Recomendações estratégicas"}</h2>
                 </div>
                 <div className="text-right text-xs text-neutral-500">
                   <div className="font-mono font-bold uppercase tracking-wider">Etapa {step - 1} de 3</div>
@@ -359,8 +398,8 @@ export default function App() {
                     <ChatQuestion
                       number={1}
                       icon={<Sparkles className="h-3.5 w-3.5" />}
-                      question="Qual atividade do Forum gerou maior valor para voce?"
-                      helper="Escolha a opcao que melhor representa sua percepcao."
+                      question="Qual atividade do Fórum gerou maior valor para você?"
+                      helper="Escolha a opção que melhor representa sua percepção."
                       error={errors.atividadeMaiorValor}
                     >
                       <div className="grid gap-3">
@@ -383,7 +422,7 @@ export default function App() {
                     <ChatQuestion
                       number={2}
                       icon={<Lightbulb className="h-3.5 w-3.5" />}
-                      question="Qual foi o principal aprendizado que voce leva deste Forum e por que ele foi significativo para voce?"
+                      question="Qual foi o principal aprendizado que você leva deste Fórum e por que ele foi significativo para você?"
                       helper="Registre sua resposta em formato livre, como se estivesse conversando com a REN Brasil."
                       error={errors.principalAprendizado}
                     >
@@ -401,7 +440,7 @@ export default function App() {
                     <ChatQuestion
                       number={3}
                       icon={<Star className="h-3.5 w-3.5" />}
-                      question="Apos participar do Forum, qual e a probabilidade de aplicar algum aprendizado em sua empresa ou organizacao?"
+                      question="Após participar do Fórum, qual é a probabilidade de aplicar algum aprendizado em sua empresa ou organização?"
                       helper="Selecione uma nota de 1 a 5."
                       error={errors.probabilidadeAplicacao}
                     >
@@ -433,8 +472,8 @@ export default function App() {
                     <ChatQuestion
                       number={4}
                       icon={<Compass className="h-3.5 w-3.5" />}
-                      question="Qual pratica apresentada pela Toyota ou discutida durante o Forum voce pretende aplicar em sua empresa ou organizacao?"
-                      helper="Escreva a pratica, conceito ou comportamento que pretende levar para sua rotina."
+                      question="Qual prática apresentada pela Toyota ou discutida durante o Fórum você pretende aplicar em sua empresa ou organização?"
+                      helper="Escreva a prática, conceito ou comportamento que pretende levar para sua rotina."
                       error={errors.praticaPretendeAplicar}
                     >
                       <textarea
@@ -442,31 +481,42 @@ export default function App() {
                         value={formData.praticaPretendeAplicar}
                         onChange={(e) => handleFieldChange("praticaPretendeAplicar", e.target.value)}
                         className="w-full resize-y rounded-xl border border-neutral-200 px-4 py-3 text-sm focus:border-brand-red focus:outline-none focus:ring-2 focus:ring-brand-red/20"
-                        placeholder="Digite aqui a pratica ou conceito que voce pretende aplicar."
+                        placeholder="Digite aqui a prática ou conceito que você pretende aplicar."
                       />
                     </ChatQuestion>
                   )}
 
-                  {activeQuestion > 5 && <ChatAnswerSummary label="Pergunta 5 respondida" value={formData.iniciativaPrioritariaREN} />}
+                  {activeQuestion > 5 && <ChatAnswerSummary label="Pergunta 5 respondida" value={formatResponseValue(formData.iniciativaPrioritariaREN)} />}
                   {activeQuestion === 5 && (
                     <ChatQuestion
                       number={5}
                       icon={<Sparkles className="h-3.5 w-3.5" />}
-                      question="Qual iniciativa da REN Brasil teria maior potencial para gerar valor para voce ou sua organizacao nos proximos dois anos?"
-                      helper="Selecione a iniciativa com maior potencial na sua visao."
+                      question="Quais iniciativas da REN Brasil teriam maior potencial para gerar valor para você ou sua organização nos próximos dois anos?"
+                      helper="Selecione até 3 iniciativas com maior potencial na sua visão."
                       error={errors.iniciativaPrioritariaREN}
                     >
+                      <div className="mb-3 text-xs font-semibold text-neutral-500">
+                        {getInitiativeSelections(formData.iniciativaPrioritariaREN).length}/3 selecionadas
+                      </div>
                       <div className="grid gap-3">
-                        {INICIATIVAS_OPTIONS.map((option) => (
-                          <button
-                            key={option}
-                            type="button"
-                            onClick={() => handleChoiceAnswer("iniciativaPrioritariaREN", option, 5)}
-                            className={`rounded-xl border px-4 py-3 text-left text-sm transition ${formData.iniciativaPrioritariaREN === option ? "border-brand-red bg-brand-red/10 text-brand-red" : "border-neutral-200 hover:border-brand-red/40 hover:bg-neutral-50"}`}
-                          >
-                            {option}
-                          </button>
-                        ))}
+                        {INICIATIVAS_OPTIONS.map((option) => {
+                          const selected = getInitiativeSelections(formData.iniciativaPrioritariaREN);
+                          const isSelected = selected.includes(option);
+                          const isDisabled = !isSelected && selected.length >= 3;
+
+                          return (
+                            <button
+                              key={option}
+                              type="button"
+                              onClick={() => handleInitiativeToggle(option)}
+                              aria-pressed={isSelected}
+                              disabled={isDisabled}
+                              className={`rounded-xl border px-4 py-3 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${isSelected ? "border-brand-red bg-brand-red/10 text-brand-red" : "border-neutral-200 hover:border-brand-red/40 hover:bg-neutral-50"}`}
+                            >
+                              {option}
+                            </button>
+                          );
+                        })}
                       </div>
                     </ChatQuestion>
                   )}
@@ -475,8 +525,8 @@ export default function App() {
                     <ChatQuestion
                       number={6}
                       icon={<Lightbulb className="h-3.5 w-3.5" />}
-                      question="Considerando os aprendizados do Forum, qual iniciativa a REN Brasil deveria liderar para fortalecer as relacoes empresariais entre Brasil, Japao e America Latina?"
-                      helper="Explique sua proposta com o nivel de detalhe que achar necessario."
+                      question="Considerando os aprendizados do Fórum, qual iniciativa a REN Brasil deveria liderar para fortalecer as relações empresariais entre Brasil, Japão e América Latina?"
+                      helper="Explique sua proposta com o nível de detalhe que achar necessário."
                       error={errors.recomendacaoEstrategicaREN}
                     >
                       <textarea
@@ -484,7 +534,7 @@ export default function App() {
                         value={formData.recomendacaoEstrategicaREN}
                         onChange={(e) => handleFieldChange("recomendacaoEstrategicaREN", e.target.value)}
                         className="w-full resize-y rounded-xl border border-neutral-200 px-4 py-3 text-sm focus:border-brand-red focus:outline-none focus:ring-2 focus:ring-brand-red/20"
-                        placeholder="Digite aqui sua proposta de iniciativa estrategica para a REN Brasil."
+                        placeholder="Digite aqui sua proposta de iniciativa estratégica para a REN Brasil."
                       />
                     </ChatQuestion>
                   )}
@@ -509,7 +559,7 @@ export default function App() {
                 {step < 4 ? (
                   currentQuestionUsesChoice ? (
                     <div className="inline-flex items-center justify-center rounded-xl bg-neutral-100 px-5 py-3 text-sm font-semibold text-neutral-500">
-                      Selecione uma opcao para continuar
+                      Selecione uma opção para continuar
                     </div>
                   ) : (
                   <button
@@ -542,7 +592,7 @@ export default function App() {
 
       <footer className="border-t border-neutral-200/80 bg-white px-4 py-4">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 text-xs text-neutral-500 sm:flex-row">
-          <span>Forum Empresarial Nikkei Brasil-Japao</span>
+          <span>Fórum Empresarial Nikkei Brasil-Japão</span>
           <a href="#/admin" className="inline-flex items-center gap-2 rounded-full border border-neutral-200 px-3 py-2 font-semibold text-neutral-600 hover:border-brand-red/40 hover:text-brand-red">
             <Shield className="h-3.5 w-3.5" />
             Acesso administrativo
@@ -552,3 +602,6 @@ export default function App() {
     </div>
   );
 }
+
+
+

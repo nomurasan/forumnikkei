@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -32,6 +32,16 @@ function formatCSVValue(value: unknown): string {
   if (typeof (value as any)?.seconds === "number") return new Date((value as any).seconds * 1000).toISOString();
   if (Array.isArray(value)) return value.join("; ");
   return String(value);
+}
+function formatDisplayValue(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (Array.isArray(value)) return value.join("; ");
+  return String(value);
+}
+
+function toValueList(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter(Boolean).map(String);
+  return value ? [String(value)] : [];
 }
 
 export default function AdminArea() {
@@ -87,13 +97,13 @@ export default function AdminArea() {
         setAdminProfile(profile);
         await Promise.all([fetchSubmissions(), fetchAdminUsers()]);
       } else {
-        setAuthError("Este e-mail nao esta cadastrado como administrador ativo do painel.");
+        setAuthError("Este e-mail não está cadastrado como administrador ativo do painel.");
         await signOut(auth);
         setCurrentUser(null);
       }
     } catch (err) {
       console.error("Erro ao validar acesso administrativo:", err);
-      setAuthError("Nao foi possivel validar o acesso administrativo.");
+      setAuthError("Não foi possível validar o acesso administrativo.");
     } finally {
       setCheckingAccess(false);
       setLoading(false);
@@ -190,7 +200,7 @@ export default function AdminArea() {
   const activityCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     submissions.forEach((item) => {
-      const key = item.atividadeMaiorValor || "Nao informado";
+      const key = item.atividadeMaiorValor || "Não informado";
       counts[key] = (counts[key] || 0) + 1;
     });
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
@@ -199,8 +209,11 @@ export default function AdminArea() {
   const initiativeCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     submissions.forEach((item) => {
-      const key = item.iniciativaPrioritariaREN || "Nao informado";
-      counts[key] = (counts[key] || 0) + 1;
+      const values = toValueList(item.iniciativaPrioritariaREN);
+      const keys = values.length ? values : ["Não informado"];
+      keys.forEach((key) => {
+        counts[key] = (counts[key] || 0) + 1;
+      });
     });
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
   }, [submissions]);
@@ -231,7 +244,7 @@ export default function AdminArea() {
   const filteredSubmissions = useMemo(() => {
     const term = searchTerm.toLowerCase();
     return submissions.filter((item) => {
-      const haystack = `${item.participanteId || ""} ${item.atividadeMaiorValor || ""} ${item.principalAprendizado || ""} ${item.praticaPretendeAplicar || ""} ${item.iniciativaPrioritariaREN || ""}`.toLowerCase();
+      const haystack = `${item.participanteId || ""} ${item.atividadeMaiorValor || ""} ${item.principalAprendizado || ""} ${item.praticaPretendeAplicar || ""} ${formatDisplayValue(item.iniciativaPrioritariaREN)}`.toLowerCase();
       return haystack.includes(term);
     });
   }, [submissions, searchTerm]);
@@ -244,7 +257,7 @@ export default function AdminArea() {
         </div>
         <div>
           <h2 className="text-lg font-black text-neutral-800">Validando acesso</h2>
-          <p className="mt-1 text-sm text-neutral-500">Estamos verificando se o e-mail selecionado e administrador ativo.</p>
+          <p className="mt-1 text-sm text-neutral-500">Estamos verificando se o e-mail selecionado é administrador ativo.</p>
         </div>
       </div>
     );
@@ -276,7 +289,7 @@ export default function AdminArea() {
       <div className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-brand-red">Painel administrativo</p>
-          <h2 className="text-xl font-black text-neutral-800">Resumo das respostas do questionario</h2>
+          <h2 className="text-xl font-black text-neutral-800">Resumo das respostas do questionário</h2>
           <p className="mt-1 text-xs text-neutral-500">Acesso liberado para {adminProfile?.email || currentUser.email}</p>
         </div>
         <button type="button" onClick={handleLogout} className="inline-flex items-center gap-2 rounded-xl border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-700">
@@ -291,7 +304,7 @@ export default function AdminArea() {
           <p className="mt-2 text-2xl font-black text-neutral-800">{submissions.length}</p>
         </div>
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-          <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Usuarios admin</p>
+          <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Usuários admin</p>
           <p className="mt-2 text-2xl font-black text-neutral-800">{adminUsers.length}</p>
         </div>
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
@@ -299,7 +312,7 @@ export default function AdminArea() {
           <p className="mt-2 text-lg font-black text-neutral-800">{topActivity}</p>
         </div>
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-          <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Media de probabilidade</p>
+          <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Média de probabilidade</p>
           <p className="mt-2 text-2xl font-black text-neutral-800">{averageProbability}</p>
         </div>
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
@@ -311,7 +324,7 @@ export default function AdminArea() {
       <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
         <div className="mb-4 flex items-center gap-2">
           <Users className="h-4 w-4 text-brand-red" />
-          <h3 className="text-sm font-black text-neutral-800">Usuarios com acesso administrativo</h3>
+          <h3 className="text-sm font-black text-neutral-800">Usuários com acesso administrativo</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
@@ -334,7 +347,7 @@ export default function AdminArea() {
               ))}
               {!adminUsers.length && (
                 <tr>
-                  <td className="py-3 pr-4 text-neutral-500" colSpan={4}>Nenhum usuario administrativo encontrado.</td>
+                  <td className="py-3 pr-4 text-neutral-500" colSpan={4}>Nenhum usuário administrativo encontrado.</td>
                 </tr>
               )}
             </tbody>
@@ -346,7 +359,7 @@ export default function AdminArea() {
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm xl:col-span-1">
           <div className="mb-3 flex items-center gap-2">
             <BarChart3 className="h-4 w-4 text-brand-red" />
-            <h3 className="text-sm font-black text-neutral-800">Atividade do Forum</h3>
+            <h3 className="text-sm font-black text-neutral-800">Atividade do Fórum</h3>
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -364,7 +377,7 @@ export default function AdminArea() {
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm xl:col-span-1">
           <div className="mb-3 flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-brand-red" />
-            <h3 className="text-sm font-black text-neutral-800">Probabilidade de aplicacao</h3>
+            <h3 className="text-sm font-black text-neutral-800">Probabilidade de aplicação</h3>
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -432,7 +445,7 @@ export default function AdminArea() {
                   <td className="py-3 pr-4">{item.atividadeMaiorValor || "-"}</td>
                   <td className="py-3 pr-4">{item.principalAprendizado ? item.principalAprendizado.slice(0, 80) + (item.principalAprendizado.length > 80 ? "..." : "") : "-"}</td>
                   <td className="py-3 pr-4">{item.probabilidadeAplicacao ? `${item.probabilidadeAplicacao}/5` : "-"}</td>
-                  <td className="py-3 pr-4">{item.iniciativaPrioritariaREN || "-"}</td>
+                  <td className="py-3 pr-4">{formatDisplayValue(item.iniciativaPrioritariaREN) || "-"}</td>
                 </tr>
               ))}
               {!filteredSubmissions.length && (
@@ -454,14 +467,14 @@ export default function AdminArea() {
               <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">{selectedSubmission.principalAprendizado || "Sem resposta"}</p>
             </div>
             <div className="rounded-xl bg-neutral-50 p-4">
-              <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Aplicacao</p>
+              <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Aplicação</p>
               <p className="mt-2 text-sm text-neutral-700">Probabilidade: {selectedSubmission.probabilidadeAplicacao ? `${selectedSubmission.probabilidadeAplicacao}/5` : "-"}</p>
-              <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Pratica: {selectedSubmission.praticaPretendeAplicar || "Sem resposta"}</p>
+              <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Prática: {selectedSubmission.praticaPretendeAplicar || "Sem resposta"}</p>
             </div>
             <div className="rounded-xl bg-neutral-50 p-4 md:col-span-2">
-              <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Recomendacoes</p>
-              <p className="mt-2 text-sm text-neutral-700">Iniciativa prioritaria: {selectedSubmission.iniciativaPrioritariaREN || "-"}</p>
-              <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Proposta estrategica: {selectedSubmission.recomendacaoEstrategicaREN || "Sem resposta"}</p>
+              <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Recomendações</p>
+              <p className="mt-2 text-sm text-neutral-700">Iniciativas prioritárias: {formatDisplayValue(selectedSubmission.iniciativaPrioritariaREN) || "-"}</p>
+              <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Proposta estratégica: {selectedSubmission.recomendacaoEstrategicaREN || "Sem resposta"}</p>
             </div>
           </div>
         </div>
@@ -469,3 +482,6 @@ export default function AdminArea() {
     </div>
   );
 }
+
+
+

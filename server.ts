@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -75,7 +75,7 @@ function normalizeSubmission(data: any, createdAt?: string, updatedAt?: string) 
     principalAprendizado: data.principalAprendizado || "",
     probabilidadeAplicacao: Number(data.probabilidadeAplicacao) || 0,
     praticaPretendeAplicar: data.praticaPretendeAplicar || "",
-    iniciativaPrioritariaREN: data.iniciativaPrioritariaREN || "",
+    iniciativaPrioritariaREN: Array.isArray(data.iniciativaPrioritariaREN) ? data.iniciativaPrioritariaREN : data.iniciativaPrioritariaREN ? [data.iniciativaPrioritariaREN] : [],
     recomendacaoEstrategicaREN: data.recomendacaoEstrategicaREN || "",
     createdAt: timestamp,
     updatedAt: updatedTimestamp,
@@ -163,7 +163,9 @@ app.get("/api/export-csv", (_req, res) => {
 app.post("/api/respostas", (req, res) => {
   const data = req.body || {};
 
-  if (!data.atividadeMaiorValor || !data.principalAprendizado || !data.probabilidadeAplicacao || !data.praticaPretendeAplicar || !data.iniciativaPrioritariaREN || !data.recomendacaoEstrategicaREN) {
+  const selectedInitiatives = Array.isArray(data.iniciativaPrioritariaREN) ? data.iniciativaPrioritariaREN : data.iniciativaPrioritariaREN ? [data.iniciativaPrioritariaREN] : [];
+
+  if (!data.atividadeMaiorValor || !data.principalAprendizado || !data.probabilidadeAplicacao || !data.praticaPretendeAplicar || selectedInitiatives.length === 0 || !data.recomendacaoEstrategicaREN) {
     return res.status(400).json({ success: false, message: "Por favor, responda todas as seis perguntas antes de enviar." });
   }
 

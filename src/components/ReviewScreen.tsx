@@ -1,10 +1,10 @@
-/**
+﻿/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import React from "react";
-import { Edit3, FileText, CheckCircle } from "lucide-react";
+import { Edit3, FileText } from "lucide-react";
 import { FormResponse } from "../types";
 
 interface ReviewScreenProps {
@@ -14,7 +14,12 @@ interface ReviewScreenProps {
   isSubmitting: boolean;
 }
 
-export default function ReviewScreen({ data, onJumpToStep, onSubmit, isSubmitting }: ReviewScreenProps) {
+function formatListValue(value: string | string[]) {
+  if (Array.isArray(value)) return value.length ? value.join("\n") : "Não respondido";
+  return value || "Não respondido";
+}
+
+export default function ReviewScreen({ data, onJumpToStep }: ReviewScreenProps) {
   const sections = [
     {
       title: "Atividade de maior valor",
@@ -37,9 +42,9 @@ export default function ReviewScreen({ data, onJumpToStep, onSubmit, isSubmittin
       value: data.praticaPretendeAplicar || "Não respondido"
     },
     {
-      title: "Iniciativa prioritária da REN",
+      title: "Iniciativas prioritárias da REN",
       step: 3,
-      value: data.iniciativaPrioritariaREN || "Não respondido"
+      value: formatListValue(data.iniciativaPrioritariaREN)
     },
     {
       title: "Recomendação estratégica",
