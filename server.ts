@@ -6,6 +6,7 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
 import { initializeApp as initFirebaseApp } from "firebase/app";
 import {
@@ -117,7 +118,7 @@ app.get("/api/respostas", (_req, res) => {
   res.json({ success: true, count: submissions.length, data: submissions });
 });
 
-app.put("/api/respostas/:id", (req, res) => {
+app.put("/api/respostas/:id", async (req, res) => {
   const id = req.params.id;
   const submissions = readSubmissions();
   const index = submissions.findIndex((item) => item.id === id);
@@ -129,13 +130,13 @@ app.put("/api/respostas/:id", (req, res) => {
 
   if (dbFirestore) {
     const docRef = fsDoc(dbFirestore, "forum_nikkei_respostas", id);
-    fsSetDoc(docRef, { ...updated, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }, { merge: true }).catch(console.error);
+    await fsSetDoc(docRef, { ...updated, updatedAt: serverTimestamp() }, { merge: true });
   }
 
   res.json({ success: true, message: "Resposta atualizada com sucesso!", data: updated });
 });
 
-app.delete("/api/respostas/:id", (req, res) => {
+app.delete("/api/respostas/:id", async (req, res) => {
   const id = req.params.id;
   const submissions = readSubmissions();
   const index = submissions.findIndex((item) => item.id === id);
@@ -146,7 +147,7 @@ app.delete("/api/respostas/:id", (req, res) => {
 
   if (dbFirestore) {
     const docRef = fsDoc(dbFirestore, "forum_nikkei_respostas", id);
-    fsDeleteDoc(docRef).catch(console.error);
+    await fsDeleteDoc(docRef);
   }
 
   res.json({ success: true, message: "Resposta excluída com sucesso!" });
@@ -160,7 +161,7 @@ app.get("/api/export-csv", (_req, res) => {
   res.status(200).send(csv);
 });
 
-app.post("/api/respostas", (req, res) => {
+app.post("/api/respostas", async (req, res) => {
   const data = req.body || {};
 
   const selectedInitiatives = Array.isArray(data.iniciativaPrioritariaREN) ? data.iniciativaPrioritariaREN : data.iniciativaPrioritariaREN ? [data.iniciativaPrioritariaREN] : [];
@@ -171,16 +172,26 @@ app.post("/api/respostas", (req, res) => {
 
   const submissions = readSubmissions();
   const timestamp = new Date().toISOString();
-  const newSubmission = normalizeSubmission({ ...data, id: `res_${Date.now()}` }, timestamp, timestamp);
-  submissions.push(newSubmission);
-  writeSubmissions(submissions);
+  const newSubmission = normalizeSubmission({ ...data, id: `res_${crypto.randomUUID()}` }, timestamp, timestamp);
+  try {
+    if (dbFirestore) {
+      const docRef = fsDoc(dbFirestore, "forum_nikkei_respostas", newSubmission.id);
+      await fsSetDoc(docRef, { ...newSubmission, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    } else {
+      console.warn("Firebase não inicializado; salvando apenas no arquivo local.");
+    }
 
-  if (dbFirestore) {
-    const docRef = fsDoc(dbFirestore, "forum_nikkei_respostas", newSubmission.id);
-    fsSetDoc(docRef, { ...newSubmission, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }, { merge: true }).catch(console.error);
+    submissions.push(newSubmission);
+    const savedLocally = writeSubmissions(submissions);
+    if (!savedLocally) {
+      console.warn("Resposta gravada no Firebase, mas não foi possível atualizar o arquivo local.");
+    }
+
+    res.json({ success: true, message: "Resposta enviada com sucesso!", id: newSubmission.id });
+  } catch (error) {
+    console.error("Erro ao gravar resposta no Firebase:", error);
+    res.status(500).json({ success: false, message: "Não foi possível gravar a resposta no Firebase. Tente novamente." });
   }
-
-  res.json({ success: true, message: "Resposta enviada com sucesso!", id: newSubmission.id });
 });
 
 async function startServer() {
