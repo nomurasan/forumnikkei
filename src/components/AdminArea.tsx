@@ -4,9 +4,9 @@
  */
 
 import React, { useEffect, useMemo, useState } from "react";
-import { BarChart3, Download, LogIn, LogOut, Search, Shield, Sparkles, Users } from "lucide-react";
+import { BarChart3, Download, LogIn, LogOut, Search, Shield, Sparkles, Trash2, Users } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, Legend } from "recharts";
-import { auth, db, collection, doc, getDoc, getDocs, setDoc, signOut, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect } from "../lib/firebase";
+import { auth, db, collection, deleteDoc, doc, getDoc, getDocs, setDoc, signOut, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect } from "../lib/firebase";
 
 const BOOTSTRAP_ADMIN_EMAILS = ["nomura.eduardo@gmail.com", "nomura.yudas@gmail.com"];
 
@@ -167,6 +167,53 @@ export default function AdminArea() {
     window.location.href = window.location.origin + window.location.pathname;
   };
 
+
+  const isAdminMaster = adminProfile?.perfil === "admin_master";
+
+  const handleDeleteSubmission = async (submission: any) => {
+    if (!submission?.id || deletingId || isDeletingAll) return;
+    setDeleteError("");
+    const confirmed = window.confirm("Apagar esta resposta? Esta ação não pode ser desfeita.");
+    if (!confirmed) return;
+
+    setDeletingId(submission.id);
+    try {
+      await deleteDoc(doc(db, "forum_nikkei_respostas", submission.id));
+      const nextSubmissions = submissions.filter((item) => item.id !== submission.id);
+      setSubmissions(nextSubmissions);
+      setSelectedSubmission((current) => {
+        if (current?.id !== submission.id) return current;
+        return nextSubmissions[0] || null;
+      });
+    } catch (err) {
+      console.error("Erro ao apagar resposta:", err);
+      setDeleteError("Não foi possível apagar a resposta. Verifique se seu usuário é admin_master.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleDeleteAllSubmissions = async () => {
+    if (!submissions.length || isDeletingAll || deletingId) return;
+    setDeleteError("");
+    const confirmed = window.confirm(`Apagar TODAS as ${submissions.length} respostas? Esta ação não pode ser desfeita.`);
+    if (!confirmed) return;
+    const typed = window.prompt('Digite APAGAR para confirmar a exclusão de todos os registros.');
+    if (typed !== "APAGAR") return;
+
+    setIsDeletingAll(true);
+    try {
+      await Promise.all(submissions.map((item) => deleteDoc(doc(db, "forum_nikkei_respostas", item.id))));
+      setSubmissions([]);
+      setSelectedSubmission(null);
+    } catch (err) {
+      console.error("Erro ao apagar todas as respostas:", err);
+      setDeleteError("Não foi possível apagar todos os registros. Verifique se seu usuário é admin_master.");
+      await fetchSubmissions();
+    } finally {
+      setIsDeletingAll(false);
+    }
+  };
   const handleExportCSV = () => {
     const headers = [
       "id",
@@ -426,6 +473,7 @@ export default function AdminArea() {
             Gerar CSV
           </button>
         </div>
+        {deleteError && <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{deleteError}</p>}
         <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Buscar por aprendizado, atividade ou iniciativa" className="mb-4 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm" />
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
@@ -448,7 +496,7 @@ export default function AdminArea() {
               ))}
               {!filteredSubmissions.length && (
                 <tr>
-                  <td className="py-3 pr-4 text-neutral-500" colSpan={4}>Nenhuma resposta encontrada.</td>
+                  <td className="py-3 pr-4 text-neutral-500" colSpan={5}>Nenhuma resposta encontrada.</td>
                 </tr>
               )}
             </tbody>
@@ -458,7 +506,19 @@ export default function AdminArea() {
 
       {selectedSubmission && (
         <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
-          <h3 className="text-lg font-black text-neutral-800">Detalhamento da resposta</h3>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h3 className="text-lg font-black text-neutral-800">Detalhamento da resposta</h3>
+            <button
+              type="button"
+              onClick={() => handleDeleteSubmission(selectedSubmission)}
+              disabled={!isAdminMaster || deletingId === selectedSubmission.id || isDeletingAll}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+              title={isAdminMaster ? "Apagar este registro" : "Apenas admin_master pode apagar registros"}
+            >
+              <Trash2 className="h-4 w-4" />
+              {deletingId === selectedSubmission.id ? "Apagando..." : "Apagar registro"}
+            </button>
+          </div>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <div className="rounded-xl bg-neutral-50 p-4">
               <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Aprendizado</p>
