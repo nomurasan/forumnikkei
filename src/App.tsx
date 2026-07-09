@@ -84,6 +84,17 @@ export default function App() {
   const [activeQuestion, setActiveQuestion] = useState(1);
 
   const stepNames = ["Apresentacao", "Parte 1", "Parte 2", "Resumo", "Sucesso"];
+  const currentQuestionUsesChoice = [1, 3, 5].includes(activeQuestion);
+
+  const getFirstUnansweredQuestion = (data: FormResponse) => {
+    if (!data.atividadeMaiorValor.trim()) return 1;
+    if (!data.principalAprendizado.trim()) return 2;
+    if (!data.probabilidadeAplicacao) return 3;
+    if (!data.praticaPretendeAplicar.trim()) return 4;
+    if (!data.iniciativaPrioritariaREN.trim()) return 5;
+    if (!data.recomendacaoEstrategicaREN.trim()) return 6;
+    return 6;
+  };
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -120,8 +131,10 @@ export default function App() {
   }, [formData, step]);
 
   const handleStart = (resume: boolean) => {
+    let nextQuestion = 1;
     if (resume && draftData) {
       setFormData({ ...draftData });
+      nextQuestion = getFirstUnansweredQuestion(draftData);
     } else {
       setFormData({ ...DEFAULT_FORM_VALUES });
       try {
@@ -130,8 +143,8 @@ export default function App() {
         console.warn("Nao foi possivel limpar o rascunho:", e);
       }
     }
-    setStep(2);
-    setActiveQuestion(1);
+    setActiveQuestion(nextQuestion);
+    setStep(nextQuestion <= 3 ? 2 : 3);
     setErrors({});
   };
 
@@ -189,18 +202,26 @@ export default function App() {
     return Object.keys(currentErrors).length === 0;
   };
 
-  const handleNext = () => {
-    if (step === 4) return;
-    if (!validateQuestion(activeQuestion)) return;
-
-    if (activeQuestion < 6) {
-      const nextQuestion = activeQuestion + 1;
+  const moveAfterQuestion = (questionNumber: number) => {
+    if (questionNumber < 6) {
+      const nextQuestion = questionNumber + 1;
       setActiveQuestion(nextQuestion);
       setStep(nextQuestion <= 3 ? 2 : 3);
     } else {
       setStep(4);
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleChoiceAnswer = (field: keyof FormResponse, value: string | number, questionNumber: number) => {
+    handleFieldChange(field, value);
+    window.setTimeout(() => moveAfterQuestion(questionNumber), 180);
+  };
+
+  const handleNext = () => {
+    if (step === 4) return;
+    if (!validateQuestion(activeQuestion)) return;
+    moveAfterQuestion(activeQuestion);
   };
 
   const handlePrev = () => {
@@ -255,6 +276,7 @@ export default function App() {
   const handleReset = () => {
     setFormData({ ...DEFAULT_FORM_VALUES });
     setStep(1);
+    setActiveQuestion(1);
     setErrors({});
     setHasDraft(false);
     setDraftData(null);
@@ -346,7 +368,7 @@ export default function App() {
                           <button
                             key={option}
                             type="button"
-                            onClick={() => handleFieldChange("atividadeMaiorValor", option)}
+                            onClick={() => handleChoiceAnswer("atividadeMaiorValor", option, 1)}
                             className={`rounded-xl border px-4 py-3 text-left text-sm transition ${formData.atividadeMaiorValor === option ? "border-brand-red bg-brand-red/10 text-brand-red" : "border-neutral-200 hover:border-brand-red/40 hover:bg-neutral-50"}`}
                           >
                             {option}
@@ -388,7 +410,7 @@ export default function App() {
                           <button
                             key={option.value}
                             type="button"
-                            onClick={() => handleFieldChange("probabilidadeAplicacao", option.value)}
+                            onClick={() => handleChoiceAnswer("probabilidadeAplicacao", option.value, 3)}
                             className={`rounded-xl border px-3 py-3 text-sm transition ${formData.probabilidadeAplicacao === option.value ? "border-brand-red bg-brand-red/10 text-brand-red" : "border-neutral-200 hover:border-brand-red/40 hover:bg-neutral-50"}`}
                           >
                             {option.label}
@@ -402,58 +424,70 @@ export default function App() {
 
               {step === 3 && (
                 <div className="space-y-8">
-                  <ChatQuestion
-                    number={4}
-                    icon={<Compass className="h-3.5 w-3.5" />}
-                    question="Qual pratica apresentada pela Toyota ou discutida durante o Forum voce pretende aplicar em sua empresa ou organizacao?"
-                    helper="Escreva a pratica, conceito ou comportamento que pretende levar para sua rotina."
-                    error={errors.praticaPretendeAplicar}
-                  >
-                    <textarea
-                      rows={5}
-                      value={formData.praticaPretendeAplicar}
-                      onChange={(e) => handleFieldChange("praticaPretendeAplicar", e.target.value)}
-                      className="w-full resize-y rounded-xl border border-neutral-200 px-4 py-3 text-sm focus:border-brand-red focus:outline-none focus:ring-2 focus:ring-brand-red/20"
-                      placeholder="Digite aqui a pratica ou conceito que voce pretende aplicar."
-                    />
-                  </ChatQuestion>
+                  <ChatAnswerSummary label="Pergunta 1 respondida" value={formData.atividadeMaiorValor} />
+                  <ChatAnswerSummary label="Pergunta 2 respondida" value={formData.principalAprendizado} />
+                  <ChatAnswerSummary label="Pergunta 3 respondida" value={formData.probabilidadeAplicacao ? `${formData.probabilidadeAplicacao}/5` : ""} />
 
-                  <ChatQuestion
-                    number={5}
-                    icon={<Sparkles className="h-3.5 w-3.5" />}
-                    question="Qual iniciativa da REN Brasil teria maior potencial para gerar valor para voce ou sua organizacao nos proximos dois anos?"
-                    helper="Selecione a iniciativa com maior potencial na sua visao."
-                    error={errors.iniciativaPrioritariaREN}
-                  >
-                    <div className="grid gap-3">
-                      {INICIATIVAS_OPTIONS.map((option) => (
-                        <button
-                          key={option}
-                          type="button"
-                          onClick={() => handleFieldChange("iniciativaPrioritariaREN", option)}
-                          className={`rounded-xl border px-4 py-3 text-left text-sm transition ${formData.iniciativaPrioritariaREN === option ? "border-brand-red bg-brand-red/10 text-brand-red" : "border-neutral-200 hover:border-brand-red/40 hover:bg-neutral-50"}`}
-                        >
-                          {option}
-                        </button>
-                      ))}
-                    </div>
-                  </ChatQuestion>
+                  {activeQuestion > 4 && <ChatAnswerSummary label="Pergunta 4 respondida" value={formData.praticaPretendeAplicar} />}
+                  {activeQuestion === 4 && (
+                    <ChatQuestion
+                      number={4}
+                      icon={<Compass className="h-3.5 w-3.5" />}
+                      question="Qual pratica apresentada pela Toyota ou discutida durante o Forum voce pretende aplicar em sua empresa ou organizacao?"
+                      helper="Escreva a pratica, conceito ou comportamento que pretende levar para sua rotina."
+                      error={errors.praticaPretendeAplicar}
+                    >
+                      <textarea
+                        rows={5}
+                        value={formData.praticaPretendeAplicar}
+                        onChange={(e) => handleFieldChange("praticaPretendeAplicar", e.target.value)}
+                        className="w-full resize-y rounded-xl border border-neutral-200 px-4 py-3 text-sm focus:border-brand-red focus:outline-none focus:ring-2 focus:ring-brand-red/20"
+                        placeholder="Digite aqui a pratica ou conceito que voce pretende aplicar."
+                      />
+                    </ChatQuestion>
+                  )}
 
-                  <ChatQuestion
-                    number={6}
-                    icon={<Lightbulb className="h-3.5 w-3.5" />}
-                    question="Considerando os aprendizados do Forum, qual iniciativa a REN Brasil deveria liderar para fortalecer as relacoes empresariais entre Brasil, Japao e America Latina?"
-                    helper="Explique sua proposta com o nivel de detalhe que achar necessario."
-                    error={errors.recomendacaoEstrategicaREN}
-                  >
-                    <textarea
-                      rows={5}
-                      value={formData.recomendacaoEstrategicaREN}
-                      onChange={(e) => handleFieldChange("recomendacaoEstrategicaREN", e.target.value)}
-                      className="w-full resize-y rounded-xl border border-neutral-200 px-4 py-3 text-sm focus:border-brand-red focus:outline-none focus:ring-2 focus:ring-brand-red/20"
-                      placeholder="Digite aqui sua proposta de iniciativa estrategica para a REN Brasil."
-                    />
-                  </ChatQuestion>
+                  {activeQuestion > 5 && <ChatAnswerSummary label="Pergunta 5 respondida" value={formData.iniciativaPrioritariaREN} />}
+                  {activeQuestion === 5 && (
+                    <ChatQuestion
+                      number={5}
+                      icon={<Sparkles className="h-3.5 w-3.5" />}
+                      question="Qual iniciativa da REN Brasil teria maior potencial para gerar valor para voce ou sua organizacao nos proximos dois anos?"
+                      helper="Selecione a iniciativa com maior potencial na sua visao."
+                      error={errors.iniciativaPrioritariaREN}
+                    >
+                      <div className="grid gap-3">
+                        {INICIATIVAS_OPTIONS.map((option) => (
+                          <button
+                            key={option}
+                            type="button"
+                            onClick={() => handleChoiceAnswer("iniciativaPrioritariaREN", option, 5)}
+                            className={`rounded-xl border px-4 py-3 text-left text-sm transition ${formData.iniciativaPrioritariaREN === option ? "border-brand-red bg-brand-red/10 text-brand-red" : "border-neutral-200 hover:border-brand-red/40 hover:bg-neutral-50"}`}
+                          >
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    </ChatQuestion>
+                  )}
+
+                  {activeQuestion === 6 && (
+                    <ChatQuestion
+                      number={6}
+                      icon={<Lightbulb className="h-3.5 w-3.5" />}
+                      question="Considerando os aprendizados do Forum, qual iniciativa a REN Brasil deveria liderar para fortalecer as relacoes empresariais entre Brasil, Japao e America Latina?"
+                      helper="Explique sua proposta com o nivel de detalhe que achar necessario."
+                      error={errors.recomendacaoEstrategicaREN}
+                    >
+                      <textarea
+                        rows={5}
+                        value={formData.recomendacaoEstrategicaREN}
+                        onChange={(e) => handleFieldChange("recomendacaoEstrategicaREN", e.target.value)}
+                        className="w-full resize-y rounded-xl border border-neutral-200 px-4 py-3 text-sm focus:border-brand-red focus:outline-none focus:ring-2 focus:ring-brand-red/20"
+                        placeholder="Digite aqui sua proposta de iniciativa estrategica para a REN Brasil."
+                      />
+                    </ChatQuestion>
+                  )}
                 </div>
               )}
 
@@ -465,7 +499,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={handlePrev}
-                  disabled={step === 2}
+                  disabled={step === 2 && activeQuestion === 1}
                   className="inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-300 px-5 py-3 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <ArrowLeft className="h-4 w-4" />
@@ -473,14 +507,20 @@ export default function App() {
                 </button>
 
                 {step < 4 ? (
+                  currentQuestionUsesChoice ? (
+                    <div className="inline-flex items-center justify-center rounded-xl bg-neutral-100 px-5 py-3 text-sm font-semibold text-neutral-500">
+                      Selecione uma opcao para continuar
+                    </div>
+                  ) : (
                   <button
                     type="button"
                     onClick={handleNext}
                     className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-red px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-red-hover"
                   >
-                    Proximo
+                    {activeQuestion === 6 ? "Revisar respostas" : "Continuar"}
                     <ArrowRight className="h-4 w-4" />
                   </button>
+                  )
                 ) : (
                   <button
                     type="button"
