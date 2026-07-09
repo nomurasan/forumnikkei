@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, Compass, Lightbulb, Send, Shield, Sparkles, Star } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, Compass, Lightbulb, Send, Shield, Sparkles, Star, UserRound } from "lucide-react";
 import {
   DEFAULT_FORM_VALUES,
   FormResponse,
@@ -19,6 +19,46 @@ import SuccessScreen from "./components/SuccessScreen";
 import Logo from "./components/Logo";
 import AdminArea from "./components/AdminArea";
 
+interface ChatQuestionProps {
+  number: number;
+  icon: React.ReactNode;
+  question: string;
+  helper?: string;
+  error?: string;
+  children: React.ReactNode;
+}
+
+function ChatQuestion({ number, icon, question, helper, error, children }: ChatQuestionProps) {
+  return (
+    <section className="space-y-3">
+      <div className="flex items-start gap-3">
+        <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-red text-white">
+          <Bot className="h-4 w-4" />
+        </div>
+        <div className="max-w-3xl rounded-2xl rounded-tl-sm border border-neutral-200 bg-neutral-50 px-4 py-3 shadow-sm">
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-brand-red/10 px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-brand-red">
+            {icon}
+            Pergunta {number}
+          </div>
+          <p className="text-sm font-semibold leading-relaxed text-neutral-800">{question}</p>
+          {helper && <p className="mt-2 text-xs leading-relaxed text-neutral-500">{helper}</p>}
+        </div>
+      </div>
+
+      <div className="flex items-start justify-end gap-3">
+        <div className="w-full max-w-3xl rounded-2xl rounded-tr-sm border border-brand-red/20 bg-white px-4 py-4 shadow-sm">
+          <div className="mb-3 flex items-center gap-2 text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">
+            <UserRound className="h-3.5 w-3.5" />
+            Sua resposta
+          </div>
+          {children}
+          {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function App() {
   const [step, setStep] = useState<number>(1);
   const [formData, setFormData] = useState<FormResponse>({ ...DEFAULT_FORM_VALUES });
@@ -28,7 +68,7 @@ export default function App() {
   const [draftData, setDraftData] = useState<FormResponse | null>(null);
   const [isAdminMode, setIsAdminMode] = useState(false);
 
-  const stepNames = ["Apresentação", "Parte 1", "Parte 2", "Resumo", "Sucesso"];
+  const stepNames = ["Apresentacao", "Parte 1", "Parte 2", "Resumo", "Sucesso"];
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -59,7 +99,7 @@ export default function App() {
       try {
         localStorage.setItem("forum_nikkei_draft", JSON.stringify(formData));
       } catch (e) {
-        console.warn("Não foi possível salvar o rascunho:", e);
+        console.warn("Nao foi possivel salvar o rascunho:", e);
       }
     }
   }, [formData, step]);
@@ -72,7 +112,7 @@ export default function App() {
       try {
         localStorage.removeItem("forum_nikkei_draft");
       } catch (e) {
-        console.warn("Não foi possível limpar o rascunho:", e);
+        console.warn("Nao foi possivel limpar o rascunho:", e);
       }
     }
     setStep(2);
@@ -98,7 +138,7 @@ export default function App() {
         currentErrors.atividadeMaiorValor = "Selecione a atividade de maior valor.";
       }
       if (!formData.principalAprendizado.trim()) {
-        currentErrors.principalAprendizado = "Este campo é obrigatório.";
+        currentErrors.principalAprendizado = "Este campo e obrigatorio.";
       }
       if (!formData.probabilidadeAplicacao) {
         currentErrors.probabilidadeAplicacao = "Selecione uma probabilidade.";
@@ -107,13 +147,13 @@ export default function App() {
 
     if (currentStep === 3) {
       if (!formData.praticaPretendeAplicar.trim()) {
-        currentErrors.praticaPretendeAplicar = "Este campo é obrigatório.";
+        currentErrors.praticaPretendeAplicar = "Este campo e obrigatorio.";
       }
       if (!formData.iniciativaPrioritariaREN.trim()) {
-        currentErrors.iniciativaPrioritariaREN = "Selecione uma iniciativa prioritária.";
+        currentErrors.iniciativaPrioritariaREN = "Selecione uma iniciativa prioritaria.";
       }
       if (!formData.recomendacaoEstrategicaREN.trim()) {
-        currentErrors.recomendacaoEstrategicaREN = "Este campo é obrigatório.";
+        currentErrors.recomendacaoEstrategicaREN = "Este campo e obrigatorio.";
       }
     }
 
@@ -153,7 +193,7 @@ export default function App() {
         try {
           localStorage.removeItem("forum_nikkei_draft");
         } catch (e) {
-          console.warn("Não foi possível limpar o rascunho:", e);
+          console.warn("Nao foi possivel limpar o rascunho:", e);
         }
         setStep(5);
       } else {
@@ -161,7 +201,7 @@ export default function App() {
       }
     } catch (e) {
       console.error("Erro ao enviar:", e);
-      alert("Falha de conexão com o servidor. Tente novamente.");
+      alert("Falha de conexao com o servidor. Tente novamente.");
     } finally {
       setIsSubmitting(false);
     }
@@ -185,7 +225,7 @@ export default function App() {
               <div className="h-8 w-[1px] bg-neutral-200 hidden md:block" />
               <div className="hidden md:flex flex-col">
                 <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-brand-red leading-tight">
-                  Fórum Empresarial Nikkei Brasil–Japão
+                  Forum Empresarial Nikkei Brasil-Japao
                 </span>
                 <h1 className="text-xs font-display font-bold text-neutral-500 tracking-tight">
                   Painel Administrativo 2026
@@ -210,16 +250,16 @@ export default function App() {
             <div className="h-8 w-[1px] bg-neutral-200 hidden md:block" />
             <div className="hidden md:flex flex-col">
               <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-brand-red leading-tight">
-                Fórum Empresarial Nikkei Brasil–Japão
+                Forum Empresarial Nikkei Brasil-Japao
               </span>
               <h1 className="text-xs font-display font-bold text-neutral-500 tracking-tight">
-                Captura de aprendizados e recomendações
+                Captura de aprendizados e recomendacoes
               </h1>
             </div>
           </div>
           <div className="hidden sm:flex items-center gap-2 bg-neutral-50 border border-neutral-200/60 rounded-full px-3 py-1.5 text-[10px] text-neutral-500 font-mono font-bold uppercase tracking-wider">
             <span className="w-2 h-2 rounded-full bg-brand-red animate-pulse" />
-            Questionário 2026
+            Questionario 2026
           </div>
         </div>
       </header>
@@ -232,8 +272,8 @@ export default function App() {
             <div className="border-b border-neutral-100 bg-neutral-50/70 px-6 py-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-brand-red">Fórum Empresarial Nikkei Brasil–Japão</p>
-                  <h2 className="text-lg font-display font-black text-neutral-800">{step === 2 ? "Parte 1 — Aprendizados e aplicação" : "Parte 2 — Recomendações estratégicas"}</h2>
+                  <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-brand-red">Forum Empresarial Nikkei Brasil-Japao</p>
+                  <h2 className="text-lg font-display font-black text-neutral-800">{step === 2 ? "Parte 1 - Aprendizados e aplicacao" : "Parte 2 - Recomendacoes estrategicas"}</h2>
                 </div>
                 <div className="text-right text-xs text-neutral-500">
                   <div className="font-mono font-bold uppercase tracking-wider">Etapa {step - 1} de 3</div>
@@ -246,52 +286,51 @@ export default function App() {
               <ProgressIndicator currentStep={step} totalSteps={5} stepNames={stepNames} />
 
               {step === 2 && (
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <div className="inline-flex items-center gap-2 rounded-full bg-brand-red/10 px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-brand-red">
-                      <Sparkles className="h-3.5 w-3.5" />
-                      Pergunta 1
+                <div className="space-y-8">
+                  <ChatQuestion
+                    number={1}
+                    icon={<Sparkles className="h-3.5 w-3.5" />}
+                    question="Qual atividade do Forum gerou maior valor para voce?"
+                    helper="Escolha a opcao que melhor representa sua percepcao."
+                    error={errors.atividadeMaiorValor}
+                  >
+                    <div className="grid gap-3">
+                      {ATIVIDADES_OPTIONS.map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() => handleFieldChange("atividadeMaiorValor", option)}
+                          className={`rounded-xl border px-4 py-3 text-left text-sm transition ${formData.atividadeMaiorValor === option ? "border-brand-red bg-brand-red/10 text-brand-red" : "border-neutral-200 hover:border-brand-red/40 hover:bg-neutral-50"}`}
+                        >
+                          {option}
+                        </button>
+                      ))}
                     </div>
-                    <h3 className="text-lg font-display font-black text-neutral-800">Qual atividade do Fórum gerou maior valor para você?</h3>
-                    <p className="text-sm text-neutral-500">Escolha a opção que melhor representa sua percepção.</p>
-                  </div>
+                  </ChatQuestion>
 
-                  <div className="grid gap-3">
-                    {ATIVIDADES_OPTIONS.map((option) => (
-                      <button
-                        key={option}
-                        type="button"
-                        onClick={() => handleFieldChange("atividadeMaiorValor", option)}
-                        className={`rounded-xl border px-4 py-3 text-left text-sm transition ${formData.atividadeMaiorValor === option ? "border-brand-red bg-brand-red/10 text-brand-red" : "border-neutral-200 hover:border-brand-red/40 hover:bg-neutral-50"}`}
-                      >
-                        {option}
-                      </button>
-                    ))}
-                  </div>
-                  {errors.atividadeMaiorValor && <p className="text-sm text-red-600">{errors.atividadeMaiorValor}</p>}
-
-                  <div className="space-y-2">
-                    <div className="inline-flex items-center gap-2 rounded-full bg-brand-red/10 px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-brand-red">
-                      <Lightbulb className="h-3.5 w-3.5" />
-                      Pergunta 2
-                    </div>
-                    <label className="block text-sm font-semibold text-neutral-700">Qual foi o principal aprendizado que você leva deste Fórum e por que ele foi significativo para você?</label>
+                  <ChatQuestion
+                    number={2}
+                    icon={<Lightbulb className="h-3.5 w-3.5" />}
+                    question="Qual foi o principal aprendizado que voce leva deste Forum e por que ele foi significativo para voce?"
+                    helper="Registre sua resposta em formato livre, como se estivesse conversando com a REN Brasil."
+                    error={errors.principalAprendizado}
+                  >
                     <textarea
                       rows={5}
                       value={formData.principalAprendizado}
                       onChange={(e) => handleFieldChange("principalAprendizado", e.target.value)}
-                      className="w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm focus:border-brand-red focus:outline-none focus:ring-2 focus:ring-brand-red/20"
-                      placeholder="Descreva o principal aprendizado e por que ele foi importante para você."
+                      className="w-full resize-y rounded-xl border border-neutral-200 px-4 py-3 text-sm focus:border-brand-red focus:outline-none focus:ring-2 focus:ring-brand-red/20"
+                      placeholder="Digite aqui seu principal aprendizado e por que ele foi importante."
                     />
-                    {errors.principalAprendizado && <p className="text-sm text-red-600">{errors.principalAprendizado}</p>}
-                  </div>
+                  </ChatQuestion>
 
-                  <div className="space-y-2">
-                    <div className="inline-flex items-center gap-2 rounded-full bg-brand-red/10 px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-brand-red">
-                      <Star className="h-3.5 w-3.5" />
-                      Pergunta 3
-                    </div>
-                    <label className="block text-sm font-semibold text-neutral-700">Após participar do Fórum, qual é a probabilidade de aplicar algum aprendizado em sua empresa ou organização?</label>
+                  <ChatQuestion
+                    number={3}
+                    icon={<Star className="h-3.5 w-3.5" />}
+                    question="Apos participar do Forum, qual e a probabilidade de aplicar algum aprendizado em sua empresa ou organizacao?"
+                    helper="Selecione uma nota de 1 a 5."
+                    error={errors.probabilidadeAplicacao}
+                  >
                     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
                       {PROBABILIDADE_APLICACAO_OPTIONS.map((option) => (
                         <button
@@ -304,35 +343,35 @@ export default function App() {
                         </button>
                       ))}
                     </div>
-                    {errors.probabilidadeAplicacao && <p className="text-sm text-red-600">{errors.probabilidadeAplicacao}</p>}
-                  </div>
+                  </ChatQuestion>
                 </div>
               )}
 
               {step === 3 && (
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <div className="inline-flex items-center gap-2 rounded-full bg-brand-red/10 px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-brand-red">
-                      <Compass className="h-3.5 w-3.5" />
-                      Pergunta 4
-                    </div>
-                    <label className="block text-sm font-semibold text-neutral-700">Qual prática apresentada pela Toyota ou discutida durante o Fórum você pretende aplicar em sua empresa ou organização?</label>
+                <div className="space-y-8">
+                  <ChatQuestion
+                    number={4}
+                    icon={<Compass className="h-3.5 w-3.5" />}
+                    question="Qual pratica apresentada pela Toyota ou discutida durante o Forum voce pretende aplicar em sua empresa ou organizacao?"
+                    helper="Escreva a pratica, conceito ou comportamento que pretende levar para sua rotina."
+                    error={errors.praticaPretendeAplicar}
+                  >
                     <textarea
                       rows={5}
                       value={formData.praticaPretendeAplicar}
                       onChange={(e) => handleFieldChange("praticaPretendeAplicar", e.target.value)}
-                      className="w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm focus:border-brand-red focus:outline-none focus:ring-2 focus:ring-brand-red/20"
-                      placeholder="Descreva a prática ou conceito que você pretende levar para a sua organização."
+                      className="w-full resize-y rounded-xl border border-neutral-200 px-4 py-3 text-sm focus:border-brand-red focus:outline-none focus:ring-2 focus:ring-brand-red/20"
+                      placeholder="Digite aqui a pratica ou conceito que voce pretende aplicar."
                     />
-                    {errors.praticaPretendeAplicar && <p className="text-sm text-red-600">{errors.praticaPretendeAplicar}</p>}
-                  </div>
+                  </ChatQuestion>
 
-                  <div className="space-y-2">
-                    <div className="inline-flex items-center gap-2 rounded-full bg-brand-red/10 px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-brand-red">
-                      <Sparkles className="h-3.5 w-3.5" />
-                      Pergunta 5
-                    </div>
-                    <label className="block text-sm font-semibold text-neutral-700">Qual iniciativa da REN Brasil teria maior potencial para gerar valor para você ou sua organização nos próximos dois anos?</label>
+                  <ChatQuestion
+                    number={5}
+                    icon={<Sparkles className="h-3.5 w-3.5" />}
+                    question="Qual iniciativa da REN Brasil teria maior potencial para gerar valor para voce ou sua organizacao nos proximos dois anos?"
+                    helper="Selecione a iniciativa com maior potencial na sua visao."
+                    error={errors.iniciativaPrioritariaREN}
+                  >
                     <div className="grid gap-3">
                       {INICIATIVAS_OPTIONS.map((option) => (
                         <button
@@ -345,24 +384,23 @@ export default function App() {
                         </button>
                       ))}
                     </div>
-                    {errors.iniciativaPrioritariaREN && <p className="text-sm text-red-600">{errors.iniciativaPrioritariaREN}</p>}
-                  </div>
+                  </ChatQuestion>
 
-                  <div className="space-y-2">
-                    <div className="inline-flex items-center gap-2 rounded-full bg-brand-red/10 px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-brand-red">
-                      <Lightbulb className="h-3.5 w-3.5" />
-                      Pergunta 6
-                    </div>
-                    <label className="block text-sm font-semibold text-neutral-700">Considerando os aprendizados do Fórum, qual iniciativa a REN Brasil deveria liderar para fortalecer as relações empresariais entre Brasil, Japão e América Latina? Explique sua proposta.</label>
+                  <ChatQuestion
+                    number={6}
+                    icon={<Lightbulb className="h-3.5 w-3.5" />}
+                    question="Considerando os aprendizados do Forum, qual iniciativa a REN Brasil deveria liderar para fortalecer as relacoes empresariais entre Brasil, Japao e America Latina?"
+                    helper="Explique sua proposta com o nivel de detalhe que achar necessario."
+                    error={errors.recomendacaoEstrategicaREN}
+                  >
                     <textarea
                       rows={5}
                       value={formData.recomendacaoEstrategicaREN}
                       onChange={(e) => handleFieldChange("recomendacaoEstrategicaREN", e.target.value)}
-                      className="w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm focus:border-brand-red focus:outline-none focus:ring-2 focus:ring-brand-red/20"
-                      placeholder="Descreva sua proposta de iniciativa estratégica para a REN Brasil."
+                      className="w-full resize-y rounded-xl border border-neutral-200 px-4 py-3 text-sm focus:border-brand-red focus:outline-none focus:ring-2 focus:ring-brand-red/20"
+                      placeholder="Digite aqui sua proposta de iniciativa estrategica para a REN Brasil."
                     />
-                    {errors.recomendacaoEstrategicaREN && <p className="text-sm text-red-600">{errors.recomendacaoEstrategicaREN}</p>}
-                  </div>
+                  </ChatQuestion>
                 </div>
               )}
 
@@ -387,7 +425,7 @@ export default function App() {
                     onClick={handleNext}
                     className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-red px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-red-hover"
                   >
-                    Próximo
+                    Proximo
                     <ArrowRight className="h-4 w-4" />
                   </button>
                 ) : (
