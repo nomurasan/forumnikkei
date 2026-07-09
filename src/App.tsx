@@ -289,25 +289,32 @@ export default function App() {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      const response = await fetch("/api/respostas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData)
-      });
-      const result = await response.json();
-      if (result.success) {
-        try {
-          localStorage.removeItem("forum_nikkei_draft");
-        } catch (e) {
-          console.warn("Não foi possível limpar o rascunho:", e);
-        }
-        setStep(5);
-      } else {
-        alert(result.message || "Ocorreu um erro ao enviar.");
+      const responseId = `res_${crypto.randomUUID()}`;
+      const timestamp = new Date().toISOString();
+      const payload = {
+        ...formData,
+        id: responseId,
+        participanteId: formData.participanteId || "",
+        eventoId: formData.eventoId || "forum_empresarial_nikkei_2026",
+        createdAtLocal: timestamp,
+        updatedAtLocal: timestamp,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        origem: "app_web_direto_firestore",
+        evento: "forum_empresarial_nikkei_2026"
+      };
+
+      await setDoc(doc(db, "forum_nikkei_respostas", responseId), payload);
+
+      try {
+        localStorage.removeItem("forum_nikkei_draft");
+      } catch (e) {
+        console.warn("Não foi possível limpar o rascunho:", e);
       }
+      setStep(5);
     } catch (e) {
-      console.error("Erro ao enviar:", e);
-      alert("Falha de conexao com o servidor. Tente novamente.");
+      console.error("Erro ao gravar no Firebase:", e);
+      alert("Não foi possível gravar sua resposta no Firebase. Tente novamente.");
     } finally {
       setIsSubmitting(false);
     }
@@ -603,7 +610,4 @@ export default function App() {
     </div>
   );
 }
-
-
-
 
