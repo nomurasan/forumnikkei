@@ -170,7 +170,6 @@ export default function AdminArea() {
   const handleExportCSV = () => {
     const headers = [
       "id",
-      "participanteId",
       "eventoId",
       "atividadeMaiorValor",
       "principalAprendizado",
@@ -245,7 +244,7 @@ export default function AdminArea() {
   const filteredSubmissions = useMemo(() => {
     const term = searchTerm.toLowerCase();
     return submissions.filter((item) => {
-      const haystack = `${item.participanteId || ""} ${item.atividadeMaiorValor || ""} ${item.principalAprendizado || ""} ${item.praticaPretendeAplicar || ""} ${formatDisplayValue(item.iniciativaPrioritariaREN)}`.toLowerCase();
+      const haystack = `${item.atividadeMaiorValor || ""} ${item.principalAprendizado || ""} ${item.praticaPretendeAplicar || ""} ${formatDisplayValue(item.iniciativaPrioritariaREN)}`.toLowerCase();
       return haystack.includes(term);
     });
   }, [submissions, searchTerm]);
@@ -427,12 +426,11 @@ export default function AdminArea() {
             Gerar CSV
           </button>
         </div>
-        <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Buscar por participante, aprendizado ou iniciativa" className="mb-4 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm" />
+        <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Buscar por aprendizado, atividade ou iniciativa" className="mb-4 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm" />
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead>
               <tr className="border-b border-neutral-200 text-neutral-600">
-                <th className="py-2 pr-4">Participante</th>
                 <th className="py-2 pr-4">Atividade</th>
                 <th className="py-2 pr-4">Aprendizado</th>
                 <th className="py-2 pr-4">Probabilidade</th>
@@ -442,7 +440,6 @@ export default function AdminArea() {
             <tbody>
               {filteredSubmissions.map((item) => (
                 <tr key={item.id} className="cursor-pointer border-b border-neutral-100 hover:bg-neutral-50" onClick={() => setSelectedSubmission(item)}>
-                  <td className="py-3 pr-4">{item.participanteId || "-"}</td>
                   <td className="py-3 pr-4">{item.atividadeMaiorValor || "-"}</td>
                   <td className="py-3 pr-4">{item.principalAprendizado ? item.principalAprendizado.slice(0, 80) + (item.principalAprendizado.length > 80 ? "..." : "") : "-"}</td>
                   <td className="py-3 pr-4">{item.probabilidadeAplicacao ? `${item.probabilidadeAplicacao}/5` : "-"}</td>
@@ -451,7 +448,7 @@ export default function AdminArea() {
               ))}
               {!filteredSubmissions.length && (
                 <tr>
-                  <td className="py-3 pr-4 text-neutral-500" colSpan={5}>Nenhuma resposta encontrada.</td>
+                  <td className="py-3 pr-4 text-neutral-500" colSpan={4}>Nenhuma resposta encontrada.</td>
                 </tr>
               )}
             </tbody>
