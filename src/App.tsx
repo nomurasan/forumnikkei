@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, Bot, Compass, Lightbulb, Send, Shield, Sparkles, Star, UserRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, Compass, Lightbulb, Mic, MicOff, Send, Shield, Sparkles, Star, UserRound } from "lucide-react";
 import {
   DEFAULT_FORM_VALUES,
   FormResponse,
@@ -74,6 +74,140 @@ function ChatAnswerSummary({ label, value }: { label: string; value: string }) {
   );
 }
 
+
+type SpeechRecognitionResultLike = {
+  isFinal: boolean;
+  [index: number]: { transcript: string };
+};
+
+type SpeechRecognitionEventLike = {
+  resultIndex: number;
+  results: SpeechRecognitionResultLike[];
+};
+
+type SpeechRecognitionErrorEventLike = {
+  error: string;
+};
+
+type SpeechRecognitionLike = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
+
+interface VoiceTextareaProps {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}
+
+function VoiceTextarea({ value, onChange, placeholder }: VoiceTextareaProps) {
+  const recognitionRef = React.useRef<SpeechRecognitionLike | null>(null);
+  const valueRef = React.useRef(value);
+  const [isListening, setIsListening] = useState(false);
+  const [speechStatus, setSpeechStatus] = useState<string | null>(null);
+
+  const supportsSpeechRecognition = typeof window !== "undefined" && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
+
+  useEffect(() => {
+    return () => {
+      recognitionRef.current?.stop();
+    };
+  }, []);
+
+  const appendTranscript = (transcript: string) => {
+    const cleanTranscript = transcript.trim();
+    if (!cleanTranscript) return;
+    const currentValue = valueRef.current;
+    const separator = currentValue.trim() ? " " : "";
+    const nextValue = `${currentValue}${separator}${cleanTranscript}`;
+    valueRef.current = nextValue;
+    onChange(nextValue);
+  };
+
+  const startListening = () => {
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Recognition) {
+      setSpeechStatus("Reconhecimento de voz indisponível neste navegador.");
+      return;
+    }
+
+    recognitionRef.current?.stop();
+    const recognition = new Recognition();
+    recognition.lang = "pt-BR";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.onresult = (event) => {
+      let finalTranscript = "";
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const result = event.results[index];
+        if (result.isFinal) finalTranscript += result[0].transcript;
+      }
+      appendTranscript(finalTranscript);
+    };
+    recognition.onerror = (event) => {
+      setIsListening(false);
+      setSpeechStatus(event.error === "not-allowed" ? "Permita o uso do microfone para ditar a resposta." : "Não foi possível capturar a fala. Tente novamente.");
+    };
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+    setSpeechStatus(null);
+    setIsListening(true);
+    recognition.start();
+  };
+
+  const stopListening = () => {
+    recognitionRef.current?.stop();
+    setIsListening(false);
+  };
+
+  return (
+    <div className="space-y-3">
+      <textarea
+        rows={5}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full resize-y rounded-xl border border-neutral-200 px-4 py-3 text-sm focus:border-brand-red focus:outline-none focus:ring-2 focus:ring-brand-red/20"
+        placeholder={placeholder}
+      />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <button
+          type="button"
+          onClick={isListening ? stopListening : startListening}
+          disabled={!supportsSpeechRecognition}
+          className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${isListening ? "border-brand-red bg-brand-red text-white" : "border-neutral-300 text-neutral-700 hover:border-brand-red/40 hover:text-brand-red"}`}
+        >
+          {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+          {isListening ? "Parar gravação" : "Responder por voz"}
+        </button>
+        <p className={`text-xs ${speechStatus ? "text-red-600" : "text-neutral-500"}`}>
+          {speechStatus || (isListening ? "Ouvindo... fale sua resposta." : supportsSpeechRecognition ? "Toque para ditar sua resposta." : "Voz indisponível neste navegador.")}
+        </p>
+      </div>
+    </div>
+  );
+}
 export default function App() {
   const [step, setStep] = useState<number>(1);
   const [formData, setFormData] = useState<FormResponse>({ ...DEFAULT_FORM_VALUES });
@@ -443,11 +577,9 @@ export default function App() {
                       helper="Registre sua resposta em formato livre, como se estivesse conversando com a REN Brasil."
                       error={errors.principalAprendizado}
                     >
-                      <textarea
-                        rows={5}
+                      <VoiceTextarea
                         value={formData.principalAprendizado}
-                        onChange={(e) => handleFieldChange("principalAprendizado", e.target.value)}
-                        className="w-full resize-y rounded-xl border border-neutral-200 px-4 py-3 text-sm focus:border-brand-red focus:outline-none focus:ring-2 focus:ring-brand-red/20"
+                        onChange={(value) => handleFieldChange("principalAprendizado", value)}
                         placeholder="Digite aqui seu principal aprendizado e por que ele foi importante."
                       />
                     </ChatQuestion>
@@ -493,11 +625,9 @@ export default function App() {
                       helper="Escreva a prática, conceito ou comportamento que pretende levar para sua rotina."
                       error={errors.praticaPretendeAplicar}
                     >
-                      <textarea
-                        rows={5}
+                      <VoiceTextarea
                         value={formData.praticaPretendeAplicar}
-                        onChange={(e) => handleFieldChange("praticaPretendeAplicar", e.target.value)}
-                        className="w-full resize-y rounded-xl border border-neutral-200 px-4 py-3 text-sm focus:border-brand-red focus:outline-none focus:ring-2 focus:ring-brand-red/20"
+                        onChange={(value) => handleFieldChange("praticaPretendeAplicar", value)}
                         placeholder="Digite aqui a prática ou conceito que você pretende aplicar."
                       />
                     </ChatQuestion>
@@ -546,11 +676,9 @@ export default function App() {
                       helper="Explique sua proposta com o nível de detalhe que achar necessário."
                       error={errors.recomendacaoEstrategicaREN}
                     >
-                      <textarea
-                        rows={5}
+                      <VoiceTextarea
                         value={formData.recomendacaoEstrategicaREN}
-                        onChange={(e) => handleFieldChange("recomendacaoEstrategicaREN", e.target.value)}
-                        className="w-full resize-y rounded-xl border border-neutral-200 px-4 py-3 text-sm focus:border-brand-red focus:outline-none focus:ring-2 focus:ring-brand-red/20"
+                        onChange={(value) => handleFieldChange("recomendacaoEstrategicaREN", value)}
                         placeholder="Digite aqui sua proposta de iniciativa estratégica para a REN Brasil."
                       />
                     </ChatQuestion>
