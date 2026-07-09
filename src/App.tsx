@@ -59,6 +59,20 @@ function ChatQuestion({ number, icon, question, helper, error, children }: ChatQ
   );
 }
 
+function ChatAnswerSummary({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-end gap-3">
+      <div className="w-full max-w-3xl rounded-2xl rounded-tr-sm border border-brand-red/20 bg-brand-red/5 px-4 py-3">
+        <div className="mb-1 flex items-center gap-2 text-[10px] font-mono font-bold uppercase tracking-wider text-brand-red">
+          <UserRound className="h-3.5 w-3.5" />
+          {label}
+        </div>
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-neutral-700">{value || "Resposta registrada"}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [step, setStep] = useState<number>(1);
   const [formData, setFormData] = useState<FormResponse>({ ...DEFAULT_FORM_VALUES });
@@ -67,6 +81,7 @@ export default function App() {
   const [hasDraft, setHasDraft] = useState(false);
   const [draftData, setDraftData] = useState<FormResponse | null>(null);
   const [isAdminMode, setIsAdminMode] = useState(false);
+  const [activeQuestion, setActiveQuestion] = useState(1);
 
   const stepNames = ["Apresentacao", "Parte 1", "Parte 2", "Resumo", "Sucesso"];
 
@@ -116,6 +131,7 @@ export default function App() {
       }
     }
     setStep(2);
+    setActiveQuestion(1);
     setErrors({});
   };
 
@@ -130,28 +146,40 @@ export default function App() {
     }
   };
 
-  const validateStep = (currentStep: number): boolean => {
+  const validateQuestion = (questionNumber: number): boolean => {
     const currentErrors: Record<string, string> = {};
 
-    if (currentStep === 2) {
+    if (questionNumber === 1) {
       if (!formData.atividadeMaiorValor.trim()) {
         currentErrors.atividadeMaiorValor = "Selecione a atividade de maior valor.";
       }
+    }
+
+    if (questionNumber === 2) {
       if (!formData.principalAprendizado.trim()) {
         currentErrors.principalAprendizado = "Este campo e obrigatorio.";
       }
+    }
+
+    if (questionNumber === 3) {
       if (!formData.probabilidadeAplicacao) {
         currentErrors.probabilidadeAplicacao = "Selecione uma probabilidade.";
       }
     }
 
-    if (currentStep === 3) {
+    if (questionNumber === 4) {
       if (!formData.praticaPretendeAplicar.trim()) {
         currentErrors.praticaPretendeAplicar = "Este campo e obrigatorio.";
       }
+    }
+
+    if (questionNumber === 5) {
       if (!formData.iniciativaPrioritariaREN.trim()) {
         currentErrors.iniciativaPrioritariaREN = "Selecione uma iniciativa prioritaria.";
       }
+    }
+
+    if (questionNumber === 6) {
       if (!formData.recomendacaoEstrategicaREN.trim()) {
         currentErrors.recomendacaoEstrategicaREN = "Este campo e obrigatorio.";
       }
@@ -162,21 +190,38 @@ export default function App() {
   };
 
   const handleNext = () => {
-    if (validateStep(step)) {
-      setStep((prev) => prev + 1);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+    if (step === 4) return;
+    if (!validateQuestion(activeQuestion)) return;
+
+    if (activeQuestion < 6) {
+      const nextQuestion = activeQuestion + 1;
+      setActiveQuestion(nextQuestion);
+      setStep(nextQuestion <= 3 ? 2 : 3);
+    } else {
+      setStep(4);
     }
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handlePrev = () => {
-    if (step > 1) {
-      setStep((prev) => prev - 1);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+    if (step === 4) {
+      setActiveQuestion(6);
+      setStep(3);
+    } else if (step > 1 && activeQuestion > 1) {
+      const previousQuestion = activeQuestion - 1;
+      setActiveQuestion(previousQuestion);
+      setStep(previousQuestion <= 3 ? 2 : 3);
+    } else if (step > 1) {
+      setStep(1);
     }
+    setErrors({});
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleJumpToStep = (targetStep: number) => {
     setStep(targetStep);
+    if (targetStep === 2) setActiveQuestion(1);
+    if (targetStep === 3) setActiveQuestion(4);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -287,63 +332,71 @@ export default function App() {
 
               {step === 2 && (
                 <div className="space-y-8">
-                  <ChatQuestion
-                    number={1}
-                    icon={<Sparkles className="h-3.5 w-3.5" />}
-                    question="Qual atividade do Forum gerou maior valor para voce?"
-                    helper="Escolha a opcao que melhor representa sua percepcao."
-                    error={errors.atividadeMaiorValor}
-                  >
-                    <div className="grid gap-3">
-                      {ATIVIDADES_OPTIONS.map((option) => (
-                        <button
-                          key={option}
-                          type="button"
-                          onClick={() => handleFieldChange("atividadeMaiorValor", option)}
-                          className={`rounded-xl border px-4 py-3 text-left text-sm transition ${formData.atividadeMaiorValor === option ? "border-brand-red bg-brand-red/10 text-brand-red" : "border-neutral-200 hover:border-brand-red/40 hover:bg-neutral-50"}`}
-                        >
-                          {option}
-                        </button>
-                      ))}
-                    </div>
-                  </ChatQuestion>
+                  {activeQuestion > 1 && <ChatAnswerSummary label="Pergunta 1 respondida" value={formData.atividadeMaiorValor} />}
+                  {activeQuestion === 1 && (
+                    <ChatQuestion
+                      number={1}
+                      icon={<Sparkles className="h-3.5 w-3.5" />}
+                      question="Qual atividade do Forum gerou maior valor para voce?"
+                      helper="Escolha a opcao que melhor representa sua percepcao."
+                      error={errors.atividadeMaiorValor}
+                    >
+                      <div className="grid gap-3">
+                        {ATIVIDADES_OPTIONS.map((option) => (
+                          <button
+                            key={option}
+                            type="button"
+                            onClick={() => handleFieldChange("atividadeMaiorValor", option)}
+                            className={`rounded-xl border px-4 py-3 text-left text-sm transition ${formData.atividadeMaiorValor === option ? "border-brand-red bg-brand-red/10 text-brand-red" : "border-neutral-200 hover:border-brand-red/40 hover:bg-neutral-50"}`}
+                          >
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    </ChatQuestion>
+                  )}
 
-                  <ChatQuestion
-                    number={2}
-                    icon={<Lightbulb className="h-3.5 w-3.5" />}
-                    question="Qual foi o principal aprendizado que voce leva deste Forum e por que ele foi significativo para voce?"
-                    helper="Registre sua resposta em formato livre, como se estivesse conversando com a REN Brasil."
-                    error={errors.principalAprendizado}
-                  >
-                    <textarea
-                      rows={5}
-                      value={formData.principalAprendizado}
-                      onChange={(e) => handleFieldChange("principalAprendizado", e.target.value)}
-                      className="w-full resize-y rounded-xl border border-neutral-200 px-4 py-3 text-sm focus:border-brand-red focus:outline-none focus:ring-2 focus:ring-brand-red/20"
-                      placeholder="Digite aqui seu principal aprendizado e por que ele foi importante."
-                    />
-                  </ChatQuestion>
+                  {activeQuestion > 2 && <ChatAnswerSummary label="Pergunta 2 respondida" value={formData.principalAprendizado} />}
+                  {activeQuestion === 2 && (
+                    <ChatQuestion
+                      number={2}
+                      icon={<Lightbulb className="h-3.5 w-3.5" />}
+                      question="Qual foi o principal aprendizado que voce leva deste Forum e por que ele foi significativo para voce?"
+                      helper="Registre sua resposta em formato livre, como se estivesse conversando com a REN Brasil."
+                      error={errors.principalAprendizado}
+                    >
+                      <textarea
+                        rows={5}
+                        value={formData.principalAprendizado}
+                        onChange={(e) => handleFieldChange("principalAprendizado", e.target.value)}
+                        className="w-full resize-y rounded-xl border border-neutral-200 px-4 py-3 text-sm focus:border-brand-red focus:outline-none focus:ring-2 focus:ring-brand-red/20"
+                        placeholder="Digite aqui seu principal aprendizado e por que ele foi importante."
+                      />
+                    </ChatQuestion>
+                  )}
 
-                  <ChatQuestion
-                    number={3}
-                    icon={<Star className="h-3.5 w-3.5" />}
-                    question="Apos participar do Forum, qual e a probabilidade de aplicar algum aprendizado em sua empresa ou organizacao?"
-                    helper="Selecione uma nota de 1 a 5."
-                    error={errors.probabilidadeAplicacao}
-                  >
-                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-                      {PROBABILIDADE_APLICACAO_OPTIONS.map((option) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => handleFieldChange("probabilidadeAplicacao", option.value)}
-                          className={`rounded-xl border px-3 py-3 text-sm transition ${formData.probabilidadeAplicacao === option.value ? "border-brand-red bg-brand-red/10 text-brand-red" : "border-neutral-200 hover:border-brand-red/40 hover:bg-neutral-50"}`}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                  </ChatQuestion>
+                  {activeQuestion === 3 && (
+                    <ChatQuestion
+                      number={3}
+                      icon={<Star className="h-3.5 w-3.5" />}
+                      question="Apos participar do Forum, qual e a probabilidade de aplicar algum aprendizado em sua empresa ou organizacao?"
+                      helper="Selecione uma nota de 1 a 5."
+                      error={errors.probabilidadeAplicacao}
+                    >
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                        {PROBABILIDADE_APLICACAO_OPTIONS.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => handleFieldChange("probabilidadeAplicacao", option.value)}
+                            className={`rounded-xl border px-3 py-3 text-sm transition ${formData.probabilidadeAplicacao === option.value ? "border-brand-red bg-brand-red/10 text-brand-red" : "border-neutral-200 hover:border-brand-red/40 hover:bg-neutral-50"}`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </ChatQuestion>
+                  )}
                 </div>
               )}
 

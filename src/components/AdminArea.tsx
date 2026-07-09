@@ -6,9 +6,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { BarChart3, Download, LogIn, LogOut, Search, Shield, Sparkles, Users } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, Legend } from "recharts";
-import { auth, db, collection, doc, getDoc, getDocs, setDoc, signOut, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "../lib/firebase";
+import { auth, db, collection, doc, getDoc, getDocs, setDoc, signOut, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect } from "../lib/firebase";
 
-const ADMIN_EMAILS = ["nomura.eduardo@gmail.com", "nomura.yudas@gmail.com"];
+const BOOTSTRAP_ADMIN_EMAILS = ["nomura.eduardo@gmail.com", "nomura.yudas@gmail.com"];
 
 interface AdminUser {
   uid: string;
@@ -36,6 +36,7 @@ function formatCSVValue(value: unknown): string {
 
 export default function AdminArea() {
   const [loading, setLoading] = useState(true);
+  const [checkingAccess, setCheckingAccess] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [adminProfile, setAdminProfile] = useState<AdminUser | null>(null);
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
@@ -47,7 +48,6 @@ export default function AdminArea() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        setCurrentUser(user);
         await ensureAdminAccess(user);
       } else {
         setCurrentUser(null);
@@ -60,13 +60,13 @@ export default function AdminArea() {
   }, []);
 
   const ensureAdminAccess = async (user: any) => {
+    setCheckingAccess(true);
     try {
       const emailLower = user.email?.toLowerCase() || "";
-      const isAuthorizedEmail = ADMIN_EMAILS.includes(emailLower);
       const docRef = doc(db, "admin_users", user.uid);
       let snap = await getDoc(docRef);
 
-      if (!snap.exists() && isAuthorizedEmail) {
+      if (!snap.exists() && BOOTSTRAP_ADMIN_EMAILS.includes(emailLower)) {
         await setDoc(docRef, {
           uid: user.uid,
           nome: user.displayName || emailLower,
@@ -78,11 +78,16 @@ export default function AdminArea() {
         snap = await getDoc(docRef);
       }
 
-      if (isAuthorizedEmail && snap.exists() && snap.data().ativo) {
-        setAdminProfile(snap.data() as AdminUser);
+      const profile = snap.exists() ? (snap.data() as AdminUser) : null;
+      const profileEmail = profile?.email?.toLowerCase() || "";
+      const hasAdminAccess = !!profile && profile.ativo && profileEmail === emailLower;
+
+      if (hasAdminAccess) {
+        setCurrentUser(user);
+        setAdminProfile(profile);
         await Promise.all([fetchSubmissions(), fetchAdminUsers()]);
       } else {
-        setAuthError("Sua conta Google nao tem autorizacao para acessar o painel.");
+        setAuthError("Este e-mail nao esta cadastrado como administrador ativo do painel.");
         await signOut(auth);
         setCurrentUser(null);
       }
@@ -90,6 +95,7 @@ export default function AdminArea() {
       console.error("Erro ao validar acesso administrativo:", err);
       setAuthError("Nao foi possivel validar o acesso administrativo.");
     } finally {
+      setCheckingAccess(false);
       setLoading(false);
     }
   };
@@ -128,10 +134,20 @@ export default function AdminArea() {
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
+      provider.addScope("email");
+      provider.addScope("profile");
       provider.setCustomParameters({ prompt: "select_account" });
       await signInWithPopup(auth, provider);
     } catch (err: any) {
-      setAuthError(err.message || "Erro ao entrar com Google.");
+      if (err?.code === "auth/popup-blocked") {
+        const provider = new GoogleAuthProvider();
+        provider.addScope("email");
+        provider.addScope("profile");
+        provider.setCustomParameters({ prompt: "select_account" });
+        await signInWithRedirect(auth, provider);
+        return;
+      }
+      setAuthError(err.message || "Erro ao abrir o seletor de contas do Google.");
       setLoading(false);
     }
   };
@@ -220,6 +236,20 @@ export default function AdminArea() {
     });
   }, [submissions, searchTerm]);
 
+  if (checkingAccess) {
+    return (
+      <div className="mx-auto flex w-full max-w-md flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-6 text-center shadow-sm">
+        <div className="mx-auto rounded-full bg-brand-red/10 p-3 text-brand-red">
+          <Shield className="h-6 w-6" />
+        </div>
+        <div>
+          <h2 className="text-lg font-black text-neutral-800">Validando acesso</h2>
+          <p className="mt-1 text-sm text-neutral-500">Estamos verificando se o e-mail selecionado e administrador ativo.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!currentUser) {
     return (
       <div className="mx-auto flex w-full max-w-md flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
@@ -229,13 +259,13 @@ export default function AdminArea() {
           </div>
           <div>
             <h2 className="text-lg font-black text-neutral-800">Acesso administrativo</h2>
-            <p className="text-sm text-neutral-500">Entre com uma conta Google autorizada para visualizar respostas e exportar CSV.</p>
+            <p className="text-sm text-neutral-500">Selecione uma conta Google. Somente e-mails cadastrados como administradores ativos acessam o painel.</p>
           </div>
         </div>
         {authError && <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{authError}</p>}
         <button type="button" onClick={handleGoogleLogin} disabled={loading} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-red px-4 py-3 text-sm font-semibold text-white hover:bg-brand-red-hover disabled:cursor-not-allowed disabled:opacity-70">
           <LogIn className="h-4 w-4" />
-          {loading ? "Entrando..." : "Entrar com Google"}
+          {loading ? "Abrindo Google..." : "Selecionar conta Google"}
         </button>
       </div>
     );
