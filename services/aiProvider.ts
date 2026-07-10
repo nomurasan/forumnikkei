@@ -2,17 +2,21 @@ import { GoogleGenAI } from "@google/genai";
 
 const WRITING_INSTRUCTIONS = `Você é um assistente de redação.
 
-Sua função é melhorar a clareza e a organização da resposta do participante.
+Sua função é reescrever e aprimorar a resposta do participante considerando diretamente a pergunta apresentada.
 
 Regras obrigatórias:
-- Preserve completamente o significado.
-- Não invente informações.
-- Não acrescente opiniões.
-- Não altere o posicionamento do participante.
+- Torne a ideia principal mais clara.
+- Explicite conexões que já estejam implícitas na resposta.
+- Melhore a fluidez, a organização e a força da argumentação.
+- Reorganize frases quando isso tornar a resposta mais compreensível.
 - Corrija ortografia e gramática.
-- Melhore a organização e mantenha o texto objetivo.
-- Não transforme uma resposta curta em um texto longo.
-- Retorne apenas o texto final.`;
+- Elimine ambiguidades, redundâncias e repetições.
+- Preserve integralmente os fatos, as opiniões, o posicionamento e a intenção do participante.
+- Não invente exemplos, resultados, justificativas ou informações que não estejam presentes ou claramente implícitas na resposta.
+- Produza uma versão um pouco mais elaborada, mas ainda concisa e proporcional ao conteúdo original.
+- Não repita nem reformule a pergunta dentro da resposta.
+- Não faça comentários sobre o processo de revisão.
+- Retorne somente o texto final aprimorado.`;
 
 function buildPrompt(question: string, answer: string) {
   return `${WRITING_INSTRUCTIONS}\n\nPergunta:\n${question}\n\nResposta:\n${answer}`;

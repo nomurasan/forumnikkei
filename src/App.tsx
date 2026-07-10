@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, Bot, Compass, Lightbulb, Mic, MicOff, RotateCcw, Send, Shield, Sparkles, Star, UserRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, Compass, Lightbulb, RotateCcw, Send, Shield, Sparkles, Star, UserRound } from "lucide-react";
 import {
   DEFAULT_FORM_VALUES,
   FormResponse,
@@ -75,41 +75,7 @@ function ChatAnswerSummary({ label, value }: { label: string; value: string }) {
 }
 
 
-type SpeechRecognitionResultLike = {
-  isFinal: boolean;
-  [index: number]: { transcript: string };
-};
-
-type SpeechRecognitionEventLike = {
-  resultIndex: number;
-  results: SpeechRecognitionResultLike[];
-};
-
-type SpeechRecognitionErrorEventLike = {
-  error: string;
-};
-
-type SpeechRecognitionLike = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-};
-
-type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
-
-declare global {
-  interface Window {
-    SpeechRecognition?: SpeechRecognitionConstructor;
-    webkitSpeechRecognition?: SpeechRecognitionConstructor;
-  }
-}
-
-interface VoiceTextareaProps {
+interface AssistedTextareaProps {
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
@@ -144,111 +110,7 @@ const createEmptyAiAnswers = (): Record<OpenAnswerField, AiAnswerState> => ({
   recomendacaoEstrategicaREN: createEmptyAiState()
 });
 
-function VoiceTextarea({ value, onChange, placeholder, aiState, onImprove, onRestore }: VoiceTextareaProps) {
-  const recognitionRef = React.useRef<SpeechRecognitionLike | null>(null);
-  const valueRef = React.useRef(value);
-  const [isListening, setIsListening] = useState(false);
-  const [speechStatus, setSpeechStatus] = useState<string | null>(null);
-
-  const supportsSpeechRecognition = typeof window !== "undefined" && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
-
-  useEffect(() => {
-    valueRef.current = value;
-  }, [value]);
-
-  useEffect(() => {
-    return () => {
-      recognitionRef.current?.stop();
-    };
-  }, []);
-
-  const appendTranscript = (transcript: string) => {
-    const cleanTranscript = transcript.trim();
-    if (!cleanTranscript) return;
-    const currentValue = valueRef.current;
-    const separator = currentValue.trim() ? " " : "";
-    const nextValue = `${currentValue}${separator}${cleanTranscript}`;
-    valueRef.current = nextValue;
-    onChange(nextValue);
-  };
-
-  const startListening = async () => {
-    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!Recognition) {
-      setSpeechStatus("Reconhecimento de voz indisponível neste navegador.");
-      return;
-    }
-
-    if (!window.isSecureContext) {
-      setSpeechStatus("O ditado por voz requer uma conexão segura (HTTPS).");
-      return;
-    }
-
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        setSpeechStatus("O navegador não permite acessar o microfone nesta página.");
-        return;
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach((track) => track.stop());
-    } catch (error) {
-      const errorName = error instanceof DOMException ? error.name : "";
-      setSpeechStatus(
-        errorName === "NotAllowedError" || errorName === "SecurityError"
-          ? "Permita o uso do microfone nas configurações do navegador."
-          : "Nenhum microfone disponível foi encontrado."
-      );
-      return;
-    }
-
-    recognitionRef.current?.stop();
-    const recognition = new Recognition();
-    let receivedTranscript = false;
-    recognition.lang = "pt-BR";
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.onresult = (event) => {
-      let finalTranscript = "";
-      for (let index = event.resultIndex; index < event.results.length; index += 1) {
-        const result = event.results[index];
-        if (result.isFinal) finalTranscript += result[0].transcript;
-      }
-      receivedTranscript = Boolean(finalTranscript.trim());
-      appendTranscript(finalTranscript);
-    };
-    recognition.onerror = (event) => {
-      setIsListening(false);
-      const messages: Record<string, string> = {
-        "not-allowed": "Permita o uso do microfone nas configurações do navegador.",
-        "service-not-allowed": "O serviço de reconhecimento de voz está bloqueado neste navegador.",
-        "audio-capture": "Nenhum microfone disponível foi encontrado.",
-        "no-speech": "Nenhuma fala foi detectada. Fale após aparecer a mensagem “Ouvindo”.",
-        network: "O serviço de voz não respondeu. Verifique a conexão e tente novamente.",
-        aborted: "O ditado por voz foi interrompido."
-      };
-      setSpeechStatus(messages[event.error] || `Não foi possível reconhecer a fala (${event.error}). Tente novamente.`);
-    };
-    recognition.onend = () => {
-      setIsListening(false);
-      if (receivedTranscript) setSpeechStatus("Fala adicionada à resposta.");
-    };
-
-    recognitionRef.current = recognition;
-    setSpeechStatus(null);
-    setIsListening(true);
-    try {
-      recognition.start();
-    } catch {
-      setIsListening(false);
-      setSpeechStatus("Não foi possível iniciar o microfone. Aguarde um instante e tente novamente.");
-    }
-  };
-
-  const stopListening = () => {
-    recognitionRef.current?.stop();
-    setIsListening(false);
-  };
-
+function AssistedTextarea({ value, onChange, placeholder, aiState, onImprove, onRestore }: AssistedTextareaProps) {
   return (
     <div className="space-y-3">
       <textarea
@@ -259,20 +121,6 @@ function VoiceTextarea({ value, onChange, placeholder, aiState, onImprove, onRes
         className="w-full resize-y rounded-xl border border-neutral-200 px-4 py-3 text-sm focus:border-brand-red focus:outline-none focus:ring-2 focus:ring-brand-red/20"
         placeholder={placeholder}
       />
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <button
-          type="button"
-          onClick={isListening ? stopListening : startListening}
-          disabled={!supportsSpeechRecognition}
-          className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${isListening ? "border-brand-red bg-brand-red text-white" : "border-neutral-300 text-neutral-700 hover:border-brand-red/40 hover:text-brand-red"}`}
-        >
-          {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-          {isListening ? "Parar gravação" : "Responder por voz"}
-        </button>
-        <p className={`text-xs ${speechStatus ? "text-red-600" : "text-neutral-500"}`}>
-          {speechStatus || (isListening ? "Ouvindo... fale sua resposta." : supportsSpeechRecognition ? "Toque para ditar sua resposta." : "Voz indisponível neste navegador.")}
-        </p>
-      </div>
       <div className="flex flex-col gap-2 border-t border-neutral-100 pt-3 sm:flex-row sm:items-center">
         <button
           type="button"
@@ -750,7 +598,7 @@ export default function App() {
                       helper="Registre sua resposta em formato livre, como se estivesse conversando com a REN Brasil."
                       error={errors.principalAprendizado}
                     >
-                      <VoiceTextarea
+                      <AssistedTextarea
                         value={formData.principalAprendizado}
                         onChange={(value) => handleFieldChange("principalAprendizado", value)}
                         placeholder="Digite aqui seu principal aprendizado e por que ele foi importante."
@@ -801,7 +649,7 @@ export default function App() {
                       helper="Escreva a prática, conceito ou comportamento que pretende levar para sua rotina."
                       error={errors.praticaPretendeAplicar}
                     >
-                      <VoiceTextarea
+                      <AssistedTextarea
                         value={formData.praticaPretendeAplicar}
                         onChange={(value) => handleFieldChange("praticaPretendeAplicar", value)}
                         placeholder="Digite aqui a prática ou conceito que você pretende aplicar."
@@ -855,7 +703,7 @@ export default function App() {
                       helper="Explique sua proposta com o nível de detalhe que achar necessário."
                       error={errors.recomendacaoEstrategicaREN}
                     >
-                      <VoiceTextarea
+                      <AssistedTextarea
                         value={formData.recomendacaoEstrategicaREN}
                         onChange={(value) => handleFieldChange("recomendacaoEstrategicaREN", value)}
                         placeholder="Digite aqui sua proposta de iniciativa estratégica para a REN Brasil."
