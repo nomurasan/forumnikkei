@@ -4,6 +4,7 @@
  */
 
 import express from "express";
+import dotenv from "dotenv";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
@@ -16,7 +17,12 @@ import {
   deleteDoc as fsDeleteDoc,
   serverTimestamp
 } from "firebase/firestore";
-import { improveAnswer } from "./services/aiProvider";
+import { getAiProviderStatus, improveAnswer } from "./services/aiProvider";
+
+// O Vite carrega .env.local apenas para o frontend; o servidor Node precisa
+// carregá-lo explicitamente. Variáveis injetadas pelo Easypanel têm prioridade.
+dotenv.config({ path: ".env.local", quiet: true, override: false });
+dotenv.config({ quiet: true, override: false });
 
 const app = express();
 const PORT = 3000;
@@ -72,12 +78,31 @@ app.post("/api/ai/improve", async (req, res) => {
     return res.status(400).json({ message: "Pergunta inválida." });
   }
 
+  const providerStatus = getAiProviderStatus();
+  if (!providerStatus.configured) {
+    console.error(`[AI] provider=${providerStatus.provider} code=not_configured`);
+    return res.status(503).json({
+      code: "AI_NOT_CONFIGURED",
+      message: "O assistente de IA ainda não foi configurado no servidor."
+    });
+  }
+
   try {
     const improvedAnswer = await improveAnswer(question, answer);
     return res.json({ improvedAnswer });
-  } catch {
+  } catch (error) {
     // Não registrar prompt, resposta, chave ou detalhes internos do provedor.
-    return res.status(503).json({ message: "Não foi possível aprimorar sua resposta. Tente novamente em alguns instantes." });
+    const errorMessage = error instanceof Error ? error.message : "";
+    const code = /404|model|not found/i.test(errorMessage)
+      ? "model_unavailable"
+      : /timeout|abort/i.test(errorMessage)
+        ? "timeout"
+        : "provider_request_failed";
+    console.error(`[AI] provider=${providerStatus.provider} model=${providerStatus.model} code=${code}`);
+    return res.status(503).json({
+      code: "AI_PROVIDER_UNAVAILABLE",
+      message: "Não foi possível aprimorar sua resposta. Tente novamente em alguns instantes."
+    });
   }
 });
 

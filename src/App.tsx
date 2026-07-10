@@ -426,8 +426,13 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question, answer })
       });
-      if (!response.ok) throw new Error("Falha ao aprimorar");
       const data = await response.json();
+      if (!response.ok) {
+        const message = data?.code === "AI_NOT_CONFIGURED"
+          ? "O assistente de IA ainda não foi configurado. Contate o administrador."
+          : data?.message || "Não foi possível aprimorar sua resposta. Tente novamente em alguns instantes.";
+        throw new Error(message);
+      }
       if (typeof data.improvedAnswer !== "string" || !data.improvedAnswer.trim()) throw new Error("Resposta inválida");
 
       const improvedAnswer = data.improvedAnswer.trim();
@@ -442,13 +447,13 @@ export default function App() {
           error: ""
         }
       }));
-    } catch {
+    } catch (error) {
       setAiAnswers((prev) => ({
         ...prev,
         [field]: {
           ...prev[field],
           loading: false,
-          error: "Não foi possível aprimorar sua resposta. Tente novamente em alguns instantes."
+          error: error instanceof Error ? error.message : "Não foi possível aprimorar sua resposta. Tente novamente em alguns instantes."
         }
       }));
     }

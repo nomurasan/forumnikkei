@@ -52,7 +52,7 @@ async function improveWithGemini(question: string, answer: string): Promise<stri
 
   const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
-    model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+    model: process.env.GEMINI_MODEL || "gemini-3.5-flash",
     contents: buildPrompt(question, answer),
     config: { maxOutputTokens: 600, temperature: 0.2 }
   });
@@ -61,8 +61,27 @@ async function improveWithGemini(question: string, answer: string): Promise<stri
   return text.trim();
 }
 
-export async function improveAnswer(question: string, answer: string): Promise<string> {
+export function getAiProviderStatus() {
   const provider = (process.env.AI_PROVIDER || "gemini").toLowerCase();
+  if (provider === "openai") {
+    return {
+      provider,
+      model: process.env.OPENAI_MODEL || "gpt-5.4-mini",
+      configured: Boolean(process.env.OPENAI_API_KEY)
+    };
+  }
+  if (provider === "gemini") {
+    return {
+      provider,
+      model: process.env.GEMINI_MODEL || "gemini-3.5-flash",
+      configured: Boolean(process.env.GEMINI_API_KEY)
+    };
+  }
+  return { provider, model: "", configured: false };
+}
+
+export async function improveAnswer(question: string, answer: string): Promise<string> {
+  const { provider } = getAiProviderStatus();
   if (provider === "openai") return improveWithOpenAI(question, answer);
   if (provider === "gemini") return improveWithGemini(question, answer);
   throw new Error("AI_PROVIDER inválido");
