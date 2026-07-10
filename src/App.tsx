@@ -129,7 +129,7 @@ function AssistedTextarea({ value, onChange, placeholder, aiState, onImprove, on
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Sparkles className="h-4 w-4" />
-          {aiState.loading ? "Aprimorando resposta..." : "Aprimorar resposta"}
+          {aiState.loading ? "Revisando resposta com IA..." : "Revisar resposta com IA"}
         </button>
         {aiState.improved && (
           <button
