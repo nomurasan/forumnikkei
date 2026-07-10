@@ -490,7 +490,48 @@ export default function AdminArea() {
         </div>
         {deleteError && <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{deleteError}</p>}
         <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Buscar por aprendizado, atividade ou iniciativa" className="mb-4 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm" />
-        <div className="overflow-x-auto">
+        <div className="space-y-3 md:hidden">
+          {filteredSubmissions.map((item) => (
+            <div key={item.id} className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Atividade</p>
+                  <p className="mt-1 text-sm font-semibold text-neutral-800">{item.atividadeMaiorValor || "-"}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteSubmission(item)}
+                  disabled={!isAdminMaster || deletingId === item.id || isDeletingAll}
+                  className="inline-flex shrink-0 items-center justify-center rounded-lg border border-red-200 p-2 text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  title={isAdminMaster ? "Apagar registro" : "Apenas admin_master pode apagar registros"}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="mt-4 grid gap-3">
+                <div className="rounded-lg bg-neutral-50 p-3">
+                  <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Aprendizado</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-neutral-700">{item.principalAprendizado || "Sem resposta"}</p>
+                </div>
+                <div className="rounded-lg bg-neutral-50 p-3">
+                  <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Aplicação</p>
+                  <p className="mt-1 text-sm text-neutral-700">Chance de aplicar: {item.probabilidadeAplicacao ? `${item.probabilidadeAplicacao}/5` : "-"}</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Prática: {item.praticaPretendeAplicar || "Sem resposta"}</p>
+                </div>
+                <div className="rounded-lg bg-neutral-50 p-3">
+                  <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Recomendações</p>
+                  <p className="mt-1 text-sm text-neutral-700">Iniciativas prioritárias: {formatDisplayValue(item.iniciativaPrioritariaREN) || "-"}</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Proposta estratégica: {item.recomendacaoEstrategicaREN || "Sem resposta"}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+          {!filteredSubmissions.length && (
+            <p className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-500">Nenhuma resposta encontrada.</p>
+          )}
+        </div>
+        <div className="hidden overflow-x-auto md:block">
           <table className="min-w-full text-left text-sm">
             <thead>
               <tr className="border-b border-neutral-200 text-neutral-600">
@@ -535,7 +576,7 @@ export default function AdminArea() {
       </div>
 
       {selectedSubmission && (
-        <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
+        <div className="hidden rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm md:block">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="text-lg font-black text-neutral-800">Detalhamento da resposta</h3>
             <button
