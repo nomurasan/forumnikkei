@@ -39,14 +39,36 @@ function normalizeAdminEmail(value: unknown): string {
   return String(value || "").trim().toLowerCase();
 }
 
+function canonicalizeAdminEmail(value: unknown): string {
+  const email = normalizeAdminEmail(value);
+  const atIndex = email.indexOf("@");
+  if (atIndex <= 0) return email;
+
+  const localRaw = email.slice(0, atIndex);
+  const domainRaw = email.slice(atIndex + 1);
+  const domain = domainRaw === "googlemail.com" ? "gmail.com" : domainRaw;
+
+  if (domain === "gmail.com") {
+    const localWithoutTag = localRaw.split("+")[0];
+    const localWithoutDots = localWithoutTag.replace(/\./g, "");
+    return `${localWithoutDots}@${domain}`;
+  }
+
+  return `${localRaw}@${domain}`;
+}
+
+function isAdminActive(value: unknown): boolean {
+  return value === true || value === "true" || value === 1 || value === "1";
+}
+
 function normalizeAdminUser(docId: string, data: any): AdminUser {
   const email = normalizeAdminEmail(data?.email || docId);
   return {
     uid: String(data?.uid || docId || email),
     nome: String(data?.nome || email),
     email,
-    perfil: String(data?.perfil || ""),
-    ativo: data?.ativo === true
+    perfil: String(data?.perfil || "").trim().toLowerCase(),
+    ativo: isAdminActive(data?.ativo)
   };
 }
 
@@ -55,7 +77,7 @@ function isValidAdminProfile(profile: AdminUser | null, signedInEmail: string): 
     profile.ativo === true &&
     profile.perfil === "admin_master" &&
     ADMIN_EMAIL_PATTERN.test(profile.email) &&
-    profile.email === signedInEmail &&
+    canonicalizeAdminEmail(profile.email) === canonicalizeAdminEmail(signedInEmail) &&
     !!profile.uid;
 }
 function formatDisplayValue(value: unknown): string {
@@ -92,6 +114,7 @@ export default function AdminArea() {
   const [deleteError, setDeleteError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isDeletingAll, setIsDeletingAll] = useState(false);
+  const [newAdminName, setNewAdminName] = useState("");
   const [newAdminEmail, setNewAdminEmail] = useState("");
   const [adminUserMessage, setAdminUserMessage] = useState("");
   const [adminUserError, setAdminUserError] = useState("");
@@ -168,6 +191,7 @@ export default function AdminArea() {
               uid: user.uid,
               nome: user.displayName || profile.nome || emailLower,
               email: emailLower,
+              emailCanonical: canonicalizeAdminEmail(emailLower),
               perfil: "admin_master",
               ativo: true,
               createdAt: serverTimestamp(),
@@ -177,9 +201,10 @@ export default function AdminArea() {
             profile.uid = user.uid;
             profile.nome = canonicalProfile.nome;
           } catch (migrationErr) {
-          console.warn("Não foi possível consolidar admin_user por UID:", migrationErr);
+            console.warn("Não foi possível consolidar admin_user por UID:", migrationErr);
           }
         }
+        setAuthError("");
         setCurrentUser(user);
         setAdminProfile(profile);
         await Promise.all([fetchSubmissions(), fetchAdminUsers()]);
@@ -221,9 +246,10 @@ export default function AdminArea() {
       const usersByEmail = new Map<string, AdminUser>();
       snap.docs.forEach((docSnap) => {
         const user = normalizeAdminUser(docSnap.id, docSnap.data());
-        const existing = usersByEmail.get(user.email);
-        if (!existing || existing.uid === user.email) {
-          usersByEmail.set(user.email, user);
+        const canonicalEmail = canonicalizeAdminEmail(user.email);
+        const existing = usersByEmail.get(canonicalEmail);
+        if (!existing || existing.uid === existing.email) {
+          usersByEmail.set(canonicalEmail, user);
         }
       });
       const users = Array.from(usersByEmail.values());
@@ -270,7 +296,12 @@ export default function AdminArea() {
     setAdminUserMessage("");
     setAdminUserError("");
 
+    const normalizedName = String(newAdminName || "").trim();
     const emailLower = normalizeAdminEmail(newAdminEmail);
+    if (!normalizedName) {
+      setAdminUserError("Informe o nome para cadastrar.");
+      return;
+    }
     if (!emailLower) {
       setAdminUserError("Informe um e-mail para cadastrar.");
       return;
@@ -284,19 +315,22 @@ export default function AdminArea() {
     try {
       await setDoc(doc(db, "admin_users", emailLower), {
         uid: emailLower,
-        nome: emailLower,
+        nome: normalizedName,
         email: emailLower,
+        emailCanonical: canonicalizeAdminEmail(emailLower),
         perfil: "admin_master",
         ativo: true,
         createdAt: serverTimestamp(),
-        createdBy: adminProfile?.email || currentUser?.email || ""
+        createdBy: adminProfile?.email || currentUser?.email || "",
+        updatedAt: serverTimestamp()
       }, { merge: true });
+      setNewAdminName("");
       setNewAdminEmail("");
-      setAdminUserMessage(`${emailLower} cadastrado como admin_master.`);
+      setAdminUserMessage(`${normalizedName} (${emailLower}) cadastrado como admin_master.`);
       await fetchAdminUsers();
     } catch (err) {
       console.error("Erro ao cadastrar admin_master:", err);
-      setAdminUserError("Não foi possível cadastrar o e-mail. Verifique se seu usuário é admin_master.");
+      setAdminUserError("Não foi possível cadastrar o administrador. Verifique se seu usuário é admin_master.");
     } finally {
       setIsCreatingAdmin(false);
     }
@@ -307,8 +341,8 @@ export default function AdminArea() {
     setAdminUserMessage("");
     setAdminUserError("");
 
-    const currentEmail = (adminProfile?.email || currentUser?.email || "").toLowerCase();
-    if (user.email?.toLowerCase() === currentEmail) {
+    const currentEmailCanonical = canonicalizeAdminEmail(adminProfile?.email || currentUser?.email || "");
+    if (canonicalizeAdminEmail(user.email) === currentEmailCanonical) {
       setAdminUserError("Você não pode excluir o próprio acesso administrativo enquanto estiver logado.");
       return;
     }
@@ -550,24 +584,35 @@ export default function AdminArea() {
               <p className="mt-1 text-xs text-neutral-500">Cadastre ou exclua e-mails autorizados a atuar como admin_master.</p>
             </div>
           </div>
-          <form onSubmit={handleCreateAdminMaster} className="flex w-full flex-col gap-2 sm:flex-row lg:max-w-xl">
+          <form onSubmit={handleCreateAdminMaster} className="flex w-full flex-col gap-2 lg:max-w-xl">
             <input
-              type="email"
-              value={newAdminEmail}
-              onChange={(event) => setNewAdminEmail(event.target.value)}
-              aria-label="E-mail do novo admin_master"
-              placeholder="novo.admin@email.com"
+              type="text"
+              value={newAdminName}
+              onChange={(event) => setNewAdminName(event.target.value)}
+              aria-label="Nome do novo admin_master"
+              placeholder="Nome completo"
               disabled={!isAdminMaster || isCreatingAdmin}
-              className="min-w-0 flex-1 rounded-xl border border-neutral-200 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:bg-neutral-50 disabled:opacity-70"
+              className="min-w-0 rounded-xl border border-neutral-200 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:bg-neutral-50 disabled:opacity-70"
             />
-            <button
-              type="submit"
-              disabled={!isAdminMaster || isCreatingAdmin}
-              className="inline-flex items-center justify-center rounded-xl bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-red-hover disabled:cursor-not-allowed disabled:opacity-60"
-              title={isAdminMaster ? "Cadastrar admin_master" : "Apenas admin_master pode cadastrar administradores"}
-            >
-              {isCreatingAdmin ? "Cadastrando..." : "Cadastrar admin_master"}
-            </button>
+            <div className="flex w-full flex-col gap-2 sm:flex-row">
+              <input
+                type="email"
+                value={newAdminEmail}
+                onChange={(event) => setNewAdminEmail(event.target.value)}
+                aria-label="E-mail do novo admin_master"
+                placeholder="novo.admin@email.com"
+                disabled={!isAdminMaster || isCreatingAdmin}
+                className="min-w-0 flex-1 rounded-xl border border-neutral-200 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:bg-neutral-50 disabled:opacity-70"
+              />
+              <button
+                type="submit"
+                disabled={!isAdminMaster || isCreatingAdmin}
+                className="inline-flex items-center justify-center rounded-xl bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-red-hover disabled:cursor-not-allowed disabled:opacity-60"
+                title={isAdminMaster ? "Cadastrar admin_master" : "Apenas admin_master pode cadastrar administradores"}
+              >
+                {isCreatingAdmin ? "Cadastrando..." : "Cadastrar admin_master"}
+              </button>
+            </div>
           </form>
         </div>
         {adminUserError && <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{adminUserError}</p>}
@@ -807,4 +852,3 @@ export default function AdminArea() {
     </div>
   );
 }
-
