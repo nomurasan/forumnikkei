@@ -6,6 +6,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { BarChart3, Download, LogIn, LogOut, Search, Shield, Sparkles, Trash2, Users } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, Legend } from "recharts";
+import { PROBABILIDADE_APLICACAO_OPTIONS } from "../types";
 import { auth, db, collection, deleteDoc, doc, getDoc, getDocs, setDoc, signOut, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, writeBatch } from "../lib/firebase";
 
 const BOOTSTRAP_ADMIN_EMAILS = ["nomura.eduardo@gmail.com", "nomura.yudas@gmail.com"];
@@ -44,6 +45,16 @@ function toValueList(value: unknown): string[] {
   return value ? [String(value)] : [];
 }
 
+function getProbabilityOption(value: unknown) {
+  const numericValue = Number(value);
+  return PROBABILIDADE_APLICACAO_OPTIONS.find((option) => option.value === numericValue) || null;
+}
+
+function formatProbabilityLabel(value: unknown): string {
+  const option = getProbabilityOption(value);
+  if (!option) return "-";
+  return `${option.label.replace(/^\d+\s*-\s*/, "")} (${option.value}/5)`;
+}
 export default function AdminArea() {
   const [loading, setLoading] = useState(true);
   const [checkingAccess, setCheckingAccess] = useState(false);
@@ -61,6 +72,7 @@ export default function AdminArea() {
   const [adminUserMessage, setAdminUserMessage] = useState("");
   const [adminUserError, setAdminUserError] = useState("");
   const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
+  const [removingAdminId, setRemovingAdminId] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -216,6 +228,33 @@ export default function AdminArea() {
       setAdminUserError("Não foi possível cadastrar o e-mail. Verifique se seu usuário é admin_master.");
     } finally {
       setIsCreatingAdmin(false);
+    }
+  };
+
+  const handleDeleteAdminUser = async (user: AdminUser) => {
+    if (!user?.uid || removingAdminId) return;
+    setAdminUserMessage("");
+    setAdminUserError("");
+
+    const currentEmail = (adminProfile?.email || currentUser?.email || "").toLowerCase();
+    if (user.email?.toLowerCase() === currentEmail) {
+      setAdminUserError("Você não pode excluir o próprio acesso administrativo enquanto estiver logado.");
+      return;
+    }
+
+    const confirmed = window.confirm(`Remover o acesso administrativo de ${user.email}?`);
+    if (!confirmed) return;
+
+    setRemovingAdminId(user.uid);
+    try {
+      await deleteDoc(doc(db, "admin_users", user.uid));
+      setAdminUserMessage(`${user.email} removido dos administradores.`);
+      await fetchAdminUsers();
+    } catch (err) {
+      console.error("Erro ao remover admin_master:", err);
+      setAdminUserError("Não foi possível excluir o e-mail. Verifique se seu usuário é admin_master.");
+    } finally {
+      setRemovingAdminId(null);
     }
   };
 
@@ -435,13 +474,17 @@ export default function AdminArea() {
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-brand-red" />
-            <h3 className="text-sm font-black text-neutral-800">Usuários com acesso administrativo</h3>
+            <div>
+              <h3 className="text-sm font-black text-neutral-800">Usuários com acesso administrativo</h3>
+              <p className="mt-1 text-xs text-neutral-500">Cadastre ou exclua e-mails autorizados a atuar como admin_master.</p>
+            </div>
           </div>
           <form onSubmit={handleCreateAdminMaster} className="flex w-full flex-col gap-2 sm:flex-row lg:max-w-xl">
             <input
               type="email"
               value={newAdminEmail}
               onChange={(event) => setNewAdminEmail(event.target.value)}
+              aria-label="E-mail do novo admin_master"
               placeholder="novo.admin@email.com"
               disabled={!isAdminMaster || isCreatingAdmin}
               className="min-w-0 flex-1 rounded-xl border border-neutral-200 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:bg-neutral-50 disabled:opacity-70"
@@ -479,7 +522,7 @@ export default function AdminArea() {
               ))}
               {!adminUsers.length && (
                 <tr>
-                  <td className="py-3 pr-4 text-neutral-500" colSpan={4}>Nenhum usuário administrativo encontrado.</td>
+                  <td className="py-3 pr-4 text-neutral-500" colSpan={5}>Nenhum usuário administrativo encontrado.</td>
                 </tr>
               )}
             </tbody>
@@ -514,7 +557,7 @@ export default function AdminArea() {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={probabilityCounts} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} label>
+                <Pie data={probabilityCounts} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} label={({ name, value }) => value ? `${name}: ${value}` : ""}>
                   <Cell fill="#b91c1c" />
                   <Cell fill="#dc2626" />
                   <Cell fill="#ef4444" />
@@ -598,7 +641,7 @@ export default function AdminArea() {
                 </div>
                 <div className="rounded-lg bg-neutral-50 p-3">
                   <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Aplicação</p>
-                  <p className="mt-1 text-sm text-neutral-700">Chance de aplicar: {item.probabilidadeAplicacao ? `${item.probabilidadeAplicacao}/5` : "-"}</p>
+                  <p className="mt-1 text-sm text-neutral-700">Chance de aplicar: {formatProbabilityLabel(item.probabilidadeAplicacao)}</p>
                   <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Prática: {item.praticaPretendeAplicar || "Sem resposta"}</p>
                 </div>
                 <div className="rounded-lg bg-neutral-50 p-3">
@@ -629,7 +672,7 @@ export default function AdminArea() {
                 <tr key={item.id} className="cursor-pointer border-b border-neutral-100 hover:bg-neutral-50" onClick={() => setSelectedSubmission(item)}>
                   <td className="py-3 pr-4">{item.atividadeMaiorValor || "-"}</td>
                   <td className="py-3 pr-4">{item.principalAprendizado ? item.principalAprendizado.slice(0, 80) + (item.principalAprendizado.length > 80 ? "..." : "") : "-"}</td>
-                  <td className="py-3 pr-4">{item.probabilidadeAplicacao ? `${item.probabilidadeAplicacao}/5` : "-"}</td>
+                  <td className="py-3 pr-4">{formatProbabilityLabel(item.probabilidadeAplicacao)}</td>
                   <td className="py-3 pr-4">{formatDisplayValue(item.iniciativaPrioritariaREN) || "-"}</td>
                   <td className="py-3 pr-4 text-right">
                     <button
@@ -679,7 +722,7 @@ export default function AdminArea() {
             </div>
             <div className="rounded-xl bg-neutral-50 p-4">
               <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Aplicação</p>
-              <p className="mt-2 text-sm text-neutral-700">Chance de aplicar: {selectedSubmission.probabilidadeAplicacao ? `${selectedSubmission.probabilidadeAplicacao}/5` : "-"}</p>
+              <p className="mt-2 text-sm text-neutral-700">Chance de aplicar: {formatProbabilityLabel(selectedSubmission.probabilidadeAplicacao)}</p>
               <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Prática: {selectedSubmission.praticaPretendeAplicar || "Sem resposta"}</p>
             </div>
             <div className="rounded-xl bg-neutral-50 p-4 md:col-span-2">
