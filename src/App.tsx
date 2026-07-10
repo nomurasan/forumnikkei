@@ -161,6 +161,7 @@ export default function App() {
 
   const stepNames = ["Apresentação", "Parte 1", "Parte 2", "Resumo", "Sucesso"];
   const currentQuestionUsesChoice = [1, 3].includes(activeQuestion);
+  const currentChoiceValue = currentQuestionUsesChoice ? (activeQuestion === 1 ? formData.atividadeMaiorValor : formData.probabilidadeAplicacao) : null;
   const mainAlignmentClass = step === 1 ? "justify-center" : "justify-start";
 
   const getInitiativeSelections = (value: FormResponse["iniciativaPrioritariaREN"] | string) => {
@@ -378,8 +379,8 @@ export default function App() {
   };
 
   const handleChoiceAnswer = (field: keyof FormResponse, value: string | number, questionNumber: number) => {
+    // Only update the value; do NOT auto-advance. User must confirm to proceed.
     handleFieldChange(field, value);
-    window.setTimeout(() => moveAfterQuestion(questionNumber), 180);
   };
 
   const handleInitiativeToggle = (value: string) => {
@@ -763,9 +764,15 @@ export default function App() {
 
                 {step < 4 ? (
                   currentQuestionUsesChoice ? (
-                    <div className="inline-flex items-center justify-center rounded-xl bg-neutral-100 px-5 py-3 text-sm font-semibold text-neutral-500">
-                      Selecione uma opção para continuar
-                    </div>
+                    <button
+                      type="button"
+                      onClick={handleNext}
+                      disabled={!currentChoiceValue}
+                      className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition ${currentChoiceValue ? "bg-brand-red text-white hover:bg-brand-red-hover" : "bg-neutral-100 text-neutral-500"}`}
+                    >
+                      {currentChoiceValue ? (isEditingFromReview ? "Confirmar" : (isEditingFromReview || activeQuestion === 6 ? "Revisar respostas" : "Continuar")) : "Selecione uma opção para continuar"}
+                      {!currentChoiceValue && null}
+                    </button>
                   ) : (
                     <button
                       type="button"
