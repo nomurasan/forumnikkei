@@ -4,6 +4,7 @@
  */
 
 import express from "express";
+import dotenv from "dotenv";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
@@ -16,11 +17,20 @@ import {
   deleteDoc as fsDeleteDoc,
   serverTimestamp
 } from "firebase/firestore";
+import { getAiProviderStatus, improveAnswer } from "./services/aiProvider";
+
+// O Vite carrega .env.local apenas para o frontend; o servidor Node precisa
+// carregá-lo explicitamente. Variáveis injetadas pelo Easypanel têm prioridade.
+dotenv.config({ path: ".env.local", quiet: true, override: false });
+dotenv.config({ quiet: true, override: false });
 
 const app = express();
 const PORT = 3000;
 const DATA_DIR = path.join(process.cwd(), "data");
 const DATA_FILE = path.join(DATA_DIR, "respostas.json");
+const AI_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const AI_RATE_LIMIT_MAX_REQUESTS = 10;
+const aiRequestsByIp = new Map<string, number[]>();
 
 let dbFirestore: any = null;
 try {
@@ -42,7 +52,59 @@ if (!fs.existsSync(DATA_FILE)) {
   fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2), "utf8");
 }
 
-app.use(express.json());
+app.set("trust proxy", 1);
+app.use(express.json({ limit: "10kb" }));
+
+app.post("/api/ai/improve", async (req, res) => {
+  const now = Date.now();
+  const clientIp = req.ip || req.socket.remoteAddress || "unknown";
+  const recentRequests = (aiRequestsByIp.get(clientIp) || []).filter((timestamp) => now - timestamp < AI_RATE_LIMIT_WINDOW_MS);
+  if (recentRequests.length >= AI_RATE_LIMIT_MAX_REQUESTS) {
+    return res.status(429).json({ message: "Limite de aprimoramentos atingido. Tente novamente em alguns instantes." });
+  }
+  recentRequests.push(now);
+  aiRequestsByIp.set(clientIp, recentRequests);
+
+  const question = typeof req.body?.question === "string" ? req.body.question.trim() : "";
+  const answer = typeof req.body?.answer === "string" ? req.body.answer.trim() : "";
+
+  if (!question || !answer) {
+    return res.status(400).json({ message: "Pergunta e resposta são obrigatórias." });
+  }
+  if (answer.length < 10 || answer.length > 2_000) {
+    return res.status(400).json({ message: "A resposta deve ter entre 10 e 2.000 caracteres." });
+  }
+  if (question.length > 1_000) {
+    return res.status(400).json({ message: "Pergunta inválida." });
+  }
+
+  const providerStatus = getAiProviderStatus();
+  if (!providerStatus.configured) {
+    console.error(`[AI] provider=${providerStatus.provider} code=not_configured`);
+    return res.status(503).json({
+      code: "AI_NOT_CONFIGURED",
+      message: "O assistente de IA ainda não foi configurado no servidor."
+    });
+  }
+
+  try {
+    const improvedAnswer = await improveAnswer(question, answer);
+    return res.json({ improvedAnswer });
+  } catch (error) {
+    // Não registrar prompt, resposta, chave ou detalhes internos do provedor.
+    const errorMessage = error instanceof Error ? error.message : "";
+    const code = /404|model|not found/i.test(errorMessage)
+      ? "model_unavailable"
+      : /timeout|abort/i.test(errorMessage)
+        ? "timeout"
+        : "provider_request_failed";
+    console.error(`[AI] provider=${providerStatus.provider} model=${providerStatus.model} code=${code}`);
+    return res.status(503).json({
+      code: "AI_PROVIDER_UNAVAILABLE",
+      message: "Não foi possível aprimorar sua resposta. Tente novamente em alguns instantes."
+    });
+  }
+});
 
 function readSubmissions(): any[] {
   try {
@@ -94,10 +156,19 @@ function convertToCSV(data: any[]): string {
     "eventoId",
     "atividadeMaiorValor",
     "principalAprendizado",
+    "principal_aprendizado_original",
+    "principal_aprendizado_final",
+    "principal_aprendizado_ia",
     "probabilidadeAplicacao",
     "praticaPretendeAplicar",
+    "pratica_pretende_aplicar_original",
+    "pratica_pretende_aplicar_final",
+    "pratica_pretende_aplicar_ia",
     "iniciativaPrioritariaREN",
     "recomendacaoEstrategicaREN",
+    "recomendacao_original",
+    "recomendacao_final",
+    "recomendacao_ia",
     "createdAt",
     "updatedAt",
     "origem",

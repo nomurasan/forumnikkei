@@ -6,7 +6,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { BarChart3, Download, LogIn, LogOut, Search, Shield, Sparkles, Trash2, Users } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, Legend } from "recharts";
-import { auth, db, collection, deleteDoc, doc, getDoc, getDocs, setDoc, signOut, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect } from "../lib/firebase";
+import { auth, db, collection, deleteDoc, doc, getDoc, getDocs, setDoc, signOut, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, writeBatch } from "../lib/firebase";
 
 const BOOTSTRAP_ADMIN_EMAILS = ["nomura.eduardo@gmail.com", "nomura.yudas@gmail.com"];
 
@@ -247,12 +247,17 @@ export default function AdminArea() {
     setDeleteError("");
     const confirmed = window.confirm(`Apagar TODAS as ${submissions.length} respostas? Esta ação não pode ser desfeita.`);
     if (!confirmed) return;
-    const typed = window.prompt('Digite APAGAR para confirmar a exclusão de todos os registros.');
-    if (typed !== "APAGAR") return;
 
     setIsDeletingAll(true);
     try {
-      await Promise.all(submissions.map((item) => deleteDoc(doc(db, "forum_nikkei_respostas", item.id))));
+      // O Firestore limita cada lote a 500 operações.
+      for (let offset = 0; offset < submissions.length; offset += 500) {
+        const batch = writeBatch(db);
+        submissions.slice(offset, offset + 500).forEach((item) => {
+          batch.delete(doc(db, "forum_nikkei_respostas", item.id));
+        });
+        await batch.commit();
+      }
       setSubmissions([]);
       setSelectedSubmission(null);
     } catch (err) {
@@ -269,10 +274,19 @@ export default function AdminArea() {
       "eventoId",
       "atividadeMaiorValor",
       "principalAprendizado",
+      "principal_aprendizado_original",
+      "principal_aprendizado_final",
+      "principal_aprendizado_ia",
       "probabilidadeAplicacao",
       "praticaPretendeAplicar",
+      "pratica_pretende_aplicar_original",
+      "pratica_pretende_aplicar_final",
+      "pratica_pretende_aplicar_ia",
       "iniciativaPrioritariaREN",
       "recomendacaoEstrategicaREN",
+      "recomendacao_original",
+      "recomendacao_final",
+      "recomendacao_ia",
       "createdAt",
       "updatedAt",
       "origem",

@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, Bot, Compass, Lightbulb, Mic, MicOff, Send, Shield, Sparkles, Star, UserRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, Compass, Lightbulb, RotateCcw, Send, Shield, Sparkles, Star, UserRound } from "lucide-react";
 import {
   DEFAULT_FORM_VALUES,
   FormResponse,
@@ -75,136 +75,75 @@ function ChatAnswerSummary({ label, value }: { label: string; value: string }) {
 }
 
 
-type SpeechRecognitionResultLike = {
-  isFinal: boolean;
-  [index: number]: { transcript: string };
-};
-
-type SpeechRecognitionEventLike = {
-  resultIndex: number;
-  results: SpeechRecognitionResultLike[];
-};
-
-type SpeechRecognitionErrorEventLike = {
-  error: string;
-};
-
-type SpeechRecognitionLike = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-};
-
-type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
-
-declare global {
-  interface Window {
-    SpeechRecognition?: SpeechRecognitionConstructor;
-    webkitSpeechRecognition?: SpeechRecognitionConstructor;
-  }
-}
-
-interface VoiceTextareaProps {
+interface AssistedTextareaProps {
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
+  aiState: AiAnswerState;
+  onImprove: () => void;
+  onRestore: () => void;
 }
 
-function VoiceTextarea({ value, onChange, placeholder }: VoiceTextareaProps) {
-  const recognitionRef = React.useRef<SpeechRecognitionLike | null>(null);
-  const valueRef = React.useRef(value);
-  const [isListening, setIsListening] = useState(false);
-  const [speechStatus, setSpeechStatus] = useState<string | null>(null);
+interface AiAnswerState {
+  originalText: string;
+  currentText: string;
+  improved: boolean;
+  loading: boolean;
+  error: string;
+}
 
-  const supportsSpeechRecognition = typeof window !== "undefined" && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+type OpenAnswerField = "principalAprendizado" | "praticaPretendeAplicar" | "recomendacaoEstrategicaREN";
 
-  useEffect(() => {
-    valueRef.current = value;
-  }, [value]);
+const OPEN_ANSWER_FIELDS: OpenAnswerField[] = ["principalAprendizado", "praticaPretendeAplicar", "recomendacaoEstrategicaREN"];
 
-  useEffect(() => {
-    return () => {
-      recognitionRef.current?.stop();
-    };
-  }, []);
+const createEmptyAiState = (): AiAnswerState => ({
+  originalText: "",
+  currentText: "",
+  improved: false,
+  loading: false,
+  error: ""
+});
 
-  const appendTranscript = (transcript: string) => {
-    const cleanTranscript = transcript.trim();
-    if (!cleanTranscript) return;
-    const currentValue = valueRef.current;
-    const separator = currentValue.trim() ? " " : "";
-    const nextValue = `${currentValue}${separator}${cleanTranscript}`;
-    valueRef.current = nextValue;
-    onChange(nextValue);
-  };
+const createEmptyAiAnswers = (): Record<OpenAnswerField, AiAnswerState> => ({
+  principalAprendizado: createEmptyAiState(),
+  praticaPretendeAplicar: createEmptyAiState(),
+  recomendacaoEstrategicaREN: createEmptyAiState()
+});
 
-  const startListening = () => {
-    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!Recognition) {
-      setSpeechStatus("Reconhecimento de voz indisponível neste navegador.");
-      return;
-    }
-
-    recognitionRef.current?.stop();
-    const recognition = new Recognition();
-    recognition.lang = "pt-BR";
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.onresult = (event) => {
-      let finalTranscript = "";
-      for (let index = event.resultIndex; index < event.results.length; index += 1) {
-        const result = event.results[index];
-        if (result.isFinal) finalTranscript += result[0].transcript;
-      }
-      appendTranscript(finalTranscript);
-    };
-    recognition.onerror = (event) => {
-      setIsListening(false);
-      setSpeechStatus(event.error === "not-allowed" ? "Permita o uso do microfone para ditar a resposta." : "Não foi possível capturar a fala. Tente novamente.");
-    };
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
-    recognitionRef.current = recognition;
-    setSpeechStatus(null);
-    setIsListening(true);
-    recognition.start();
-  };
-
-  const stopListening = () => {
-    recognitionRef.current?.stop();
-    setIsListening(false);
-  };
-
+function AssistedTextarea({ value, onChange, placeholder, aiState, onImprove, onRestore }: AssistedTextareaProps) {
   return (
     <div className="space-y-3">
       <textarea
         rows={5}
+        maxLength={2000}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="w-full resize-y rounded-xl border border-neutral-200 px-4 py-3 text-sm focus:border-brand-red focus:outline-none focus:ring-2 focus:ring-brand-red/20"
         placeholder={placeholder}
       />
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-2 border-t border-neutral-100 pt-3 sm:flex-row sm:items-center">
         <button
           type="button"
-          onClick={isListening ? stopListening : startListening}
-          disabled={!supportsSpeechRecognition}
-          className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${isListening ? "border-brand-red bg-brand-red text-white" : "border-neutral-300 text-neutral-700 hover:border-brand-red/40 hover:text-brand-red"}`}
+          onClick={onImprove}
+          disabled={!value.trim() || aiState.loading}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-          {isListening ? "Parar gravação" : "Responder por voz"}
+          <Sparkles className="h-4 w-4" />
+          {aiState.loading ? "Revisando resposta com IA..." : "Revisar resposta com IA"}
         </button>
-        <p className={`text-xs ${speechStatus ? "text-red-600" : "text-neutral-500"}`}>
-          {speechStatus || (isListening ? "Ouvindo... fale sua resposta." : supportsSpeechRecognition ? "Toque para ditar sua resposta." : "Voz indisponível neste navegador.")}
-        </p>
+        {aiState.improved && (
+          <button
+            type="button"
+            onClick={onRestore}
+            disabled={aiState.loading}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-700 transition hover:border-brand-red/40 hover:text-brand-red disabled:opacity-50"
+          >
+            <RotateCcw className="h-4 w-4" />
+            Restaurar original
+          </button>
+        )}
       </div>
+      {aiState.error && <p className="text-xs text-red-600">{aiState.error}</p>}
     </div>
   );
 }
@@ -217,6 +156,7 @@ export default function App() {
   const [draftData, setDraftData] = useState<FormResponse | null>(null);
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [activeQuestion, setActiveQuestion] = useState(1);
+  const [aiAnswers, setAiAnswers] = useState<Record<OpenAnswerField, AiAnswerState>>(createEmptyAiAnswers);
 
   const stepNames = ["Apresentação", "Parte 1", "Parte 2", "Resumo", "Sucesso"];
   const currentQuestionUsesChoice = [1, 3].includes(activeQuestion);
@@ -290,12 +230,20 @@ export default function App() {
       }
     }
     setActiveQuestion(nextQuestion);
+    setAiAnswers(createEmptyAiAnswers());
     setStep(nextQuestion <= 3 ? 2 : 3);
     setErrors({});
   };
 
   const handleFieldChange = (field: keyof FormResponse, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    if (OPEN_ANSWER_FIELDS.includes(field as OpenAnswerField)) {
+      const openField = field as OpenAnswerField;
+      setAiAnswers((prev) => ({
+        ...prev,
+        [openField]: { ...prev[openField], currentText: String(value), error: "" }
+      }));
+    }
     if (errors[field]) {
       setErrors((prev) => {
         const copy = { ...prev };
@@ -303,6 +251,69 @@ export default function App() {
         return copy;
       });
     }
+  };
+
+  const handleImproveAnswer = async (field: OpenAnswerField, question: string) => {
+    const answer = formData[field].trim();
+    if (answer.length < 10) {
+      setAiAnswers((prev) => ({
+        ...prev,
+        [field]: { ...prev[field], error: "Digite pelo menos 10 caracteres para aprimorar." }
+      }));
+      return;
+    }
+
+    setAiAnswers((prev) => ({
+      ...prev,
+      [field]: { ...prev[field], loading: true, error: "" }
+    }));
+
+    try {
+      const response = await fetch("/api/ai/improve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, answer })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        const message = data?.code === "AI_NOT_CONFIGURED"
+          ? "O assistente de IA ainda não foi configurado. Contate o administrador."
+          : data?.message || "Não foi possível aprimorar sua resposta. Tente novamente em alguns instantes.";
+        throw new Error(message);
+      }
+      if (typeof data.improvedAnswer !== "string" || !data.improvedAnswer.trim()) throw new Error("Resposta inválida");
+
+      const improvedAnswer = data.improvedAnswer.trim();
+      setFormData((prev) => ({ ...prev, [field]: improvedAnswer }));
+      setAiAnswers((prev) => ({
+        ...prev,
+        [field]: {
+          originalText: prev[field].improved ? prev[field].originalText : answer,
+          currentText: improvedAnswer,
+          improved: true,
+          loading: false,
+          error: ""
+        }
+      }));
+    } catch (error) {
+      setAiAnswers((prev) => ({
+        ...prev,
+        [field]: {
+          ...prev[field],
+          loading: false,
+          error: error instanceof Error ? error.message : "Não foi possível aprimorar sua resposta. Tente novamente em alguns instantes."
+        }
+      }));
+    }
+  };
+
+  const handleRestoreAnswer = (field: OpenAnswerField) => {
+    const originalText = aiAnswers[field].originalText;
+    setFormData((prev) => ({ ...prev, [field]: originalText }));
+    setAiAnswers((prev) => ({
+      ...prev,
+      [field]: { ...prev[field], currentText: originalText, improved: false, error: "" }
+    }));
   };
 
   const validateQuestion = (questionNumber: number): boolean => {
@@ -444,6 +455,15 @@ export default function App() {
       const timestamp = new Date().toISOString();
       const payload = {
         ...formData,
+        principal_aprendizado_original: aiAnswers.principalAprendizado.improved ? aiAnswers.principalAprendizado.originalText : formData.principalAprendizado,
+        principal_aprendizado_final: formData.principalAprendizado,
+        principal_aprendizado_ia: aiAnswers.principalAprendizado.improved,
+        pratica_pretende_aplicar_original: aiAnswers.praticaPretendeAplicar.improved ? aiAnswers.praticaPretendeAplicar.originalText : formData.praticaPretendeAplicar,
+        pratica_pretende_aplicar_final: formData.praticaPretendeAplicar,
+        pratica_pretende_aplicar_ia: aiAnswers.praticaPretendeAplicar.improved,
+        recomendacao_original: aiAnswers.recomendacaoEstrategicaREN.improved ? aiAnswers.recomendacaoEstrategicaREN.originalText : formData.recomendacaoEstrategicaREN,
+        recomendacao_final: formData.recomendacaoEstrategicaREN,
+        recomendacao_ia: aiAnswers.recomendacaoEstrategicaREN.improved,
         id: responseId,
         participanteId: formData.participanteId || "",
         eventoId: formData.eventoId || "forum_empresarial_nikkei_2026",
@@ -479,6 +499,7 @@ export default function App() {
     setErrors({});
     setHasDraft(false);
     setDraftData(null);
+    setAiAnswers(createEmptyAiAnswers());
   };
 
   if (isAdminMode) {
@@ -588,10 +609,13 @@ export default function App() {
                       helper="Registre sua resposta em formato livre, como se estivesse conversando com a REN Brasil."
                       error={errors.principalAprendizado}
                     >
-                      <VoiceTextarea
+                      <AssistedTextarea
                         value={formData.principalAprendizado}
                         onChange={(value) => handleFieldChange("principalAprendizado", value)}
                         placeholder="Digite aqui seu principal aprendizado e por que ele foi importante."
+                        aiState={aiAnswers.principalAprendizado}
+                        onImprove={() => handleImproveAnswer("principalAprendizado", "Qual foi o principal aprendizado que você leva deste Fórum e por que ele foi significativo para você?")}
+                        onRestore={() => handleRestoreAnswer("principalAprendizado")}
                       />
                     </ChatQuestion>
                   )}
@@ -636,10 +660,13 @@ export default function App() {
                       helper="Escreva a prática, conceito ou comportamento que pretende levar para sua rotina."
                       error={errors.praticaPretendeAplicar}
                     >
-                      <VoiceTextarea
+                      <AssistedTextarea
                         value={formData.praticaPretendeAplicar}
                         onChange={(value) => handleFieldChange("praticaPretendeAplicar", value)}
                         placeholder="Digite aqui a prática ou conceito que você pretende aplicar."
+                        aiState={aiAnswers.praticaPretendeAplicar}
+                        onImprove={() => handleImproveAnswer("praticaPretendeAplicar", "Qual prática apresentada pela Toyota ou discutida durante o Fórum você pretende aplicar em sua empresa ou organização?")}
+                        onRestore={() => handleRestoreAnswer("praticaPretendeAplicar")}
                       />
                     </ChatQuestion>
                   )}
@@ -687,10 +714,13 @@ export default function App() {
                       helper="Explique sua proposta com o nível de detalhe que achar necessário."
                       error={errors.recomendacaoEstrategicaREN}
                     >
-                      <VoiceTextarea
+                      <AssistedTextarea
                         value={formData.recomendacaoEstrategicaREN}
                         onChange={(value) => handleFieldChange("recomendacaoEstrategicaREN", value)}
                         placeholder="Digite aqui sua proposta de iniciativa estratégica para a REN Brasil."
+                        aiState={aiAnswers.recomendacaoEstrategicaREN}
+                        onImprove={() => handleImproveAnswer("recomendacaoEstrategicaREN", "Considerando os aprendizados do Fórum, qual iniciativa a REN Brasil deveria liderar para fortalecer as relações empresariais entre Brasil, Japão e América Latina?")}
+                        onRestore={() => handleRestoreAnswer("recomendacaoEstrategicaREN")}
                       />
                     </ChatQuestion>
                   )}
