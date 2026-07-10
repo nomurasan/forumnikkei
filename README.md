@@ -15,6 +15,10 @@ View your app in AI Studio: https://ai.studio/apps/3254a6d8-da92-4dff-94d0-f1ac4
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+2. Configure the server-only AI variables in `.env.local` (never prefix the keys with `VITE_`):
+   - Gemini: `AI_PROVIDER=gemini` and `GEMINI_API_KEY=...`
+   - OpenAI: `AI_PROVIDER=openai` and `OPENAI_API_KEY=...`
 3. Run the app:
    `npm run dev`
+
+In Easypanel, configure the same variables in the application environment. The browser calls only `POST /api/ai/improve`; provider keys are read exclusively by the Node/Express server.

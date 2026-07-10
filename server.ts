@@ -16,11 +16,15 @@ import {
   deleteDoc as fsDeleteDoc,
   serverTimestamp
 } from "firebase/firestore";
+import { improveAnswer } from "./services/aiProvider";
 
 const app = express();
 const PORT = 3000;
 const DATA_DIR = path.join(process.cwd(), "data");
 const DATA_FILE = path.join(DATA_DIR, "respostas.json");
+const AI_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const AI_RATE_LIMIT_MAX_REQUESTS = 10;
+const aiRequestsByIp = new Map<string, number[]>();
 
 let dbFirestore: any = null;
 try {
@@ -42,7 +46,40 @@ if (!fs.existsSync(DATA_FILE)) {
   fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2), "utf8");
 }
 
-app.use(express.json());
+app.set("trust proxy", 1);
+app.use(express.json({ limit: "10kb" }));
+
+app.post("/api/ai/improve", async (req, res) => {
+  const now = Date.now();
+  const clientIp = req.ip || req.socket.remoteAddress || "unknown";
+  const recentRequests = (aiRequestsByIp.get(clientIp) || []).filter((timestamp) => now - timestamp < AI_RATE_LIMIT_WINDOW_MS);
+  if (recentRequests.length >= AI_RATE_LIMIT_MAX_REQUESTS) {
+    return res.status(429).json({ message: "Limite de aprimoramentos atingido. Tente novamente em alguns instantes." });
+  }
+  recentRequests.push(now);
+  aiRequestsByIp.set(clientIp, recentRequests);
+
+  const question = typeof req.body?.question === "string" ? req.body.question.trim() : "";
+  const answer = typeof req.body?.answer === "string" ? req.body.answer.trim() : "";
+
+  if (!question || !answer) {
+    return res.status(400).json({ message: "Pergunta e resposta são obrigatórias." });
+  }
+  if (answer.length < 10 || answer.length > 2_000) {
+    return res.status(400).json({ message: "A resposta deve ter entre 10 e 2.000 caracteres." });
+  }
+  if (question.length > 1_000) {
+    return res.status(400).json({ message: "Pergunta inválida." });
+  }
+
+  try {
+    const improvedAnswer = await improveAnswer(question, answer);
+    return res.json({ improvedAnswer });
+  } catch {
+    // Não registrar prompt, resposta, chave ou detalhes internos do provedor.
+    return res.status(503).json({ message: "Não foi possível aprimorar sua resposta. Tente novamente em alguns instantes." });
+  }
+});
 
 function readSubmissions(): any[] {
   try {
@@ -94,10 +131,19 @@ function convertToCSV(data: any[]): string {
     "eventoId",
     "atividadeMaiorValor",
     "principalAprendizado",
+    "principal_aprendizado_original",
+    "principal_aprendizado_final",
+    "principal_aprendizado_ia",
     "probabilidadeAplicacao",
     "praticaPretendeAplicar",
+    "pratica_pretende_aplicar_original",
+    "pratica_pretende_aplicar_final",
+    "pratica_pretende_aplicar_ia",
     "iniciativaPrioritariaREN",
     "recomendacaoEstrategicaREN",
+    "recomendacao_original",
+    "recomendacao_final",
+    "recomendacao_ia",
     "createdAt",
     "updatedAt",
     "origem",
