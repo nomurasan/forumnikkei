@@ -143,38 +143,76 @@ function VoiceTextarea({ value, onChange, placeholder }: VoiceTextareaProps) {
     onChange(nextValue);
   };
 
-  const startListening = () => {
+  const startListening = async () => {
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!Recognition) {
       setSpeechStatus("Reconhecimento de voz indisponível neste navegador.");
       return;
     }
 
+    if (!window.isSecureContext) {
+      setSpeechStatus("O ditado por voz requer uma conexão segura (HTTPS).");
+      return;
+    }
+
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setSpeechStatus("O navegador não permite acessar o microfone nesta página.");
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop());
+    } catch (error) {
+      const errorName = error instanceof DOMException ? error.name : "";
+      setSpeechStatus(
+        errorName === "NotAllowedError" || errorName === "SecurityError"
+          ? "Permita o uso do microfone nas configurações do navegador."
+          : "Nenhum microfone disponível foi encontrado."
+      );
+      return;
+    }
+
     recognitionRef.current?.stop();
     const recognition = new Recognition();
+    let receivedTranscript = false;
     recognition.lang = "pt-BR";
-    recognition.continuous = true;
-    recognition.interimResults = true;
+    recognition.continuous = false;
+    recognition.interimResults = false;
     recognition.onresult = (event) => {
       let finalTranscript = "";
       for (let index = event.resultIndex; index < event.results.length; index += 1) {
         const result = event.results[index];
         if (result.isFinal) finalTranscript += result[0].transcript;
       }
+      receivedTranscript = Boolean(finalTranscript.trim());
       appendTranscript(finalTranscript);
     };
     recognition.onerror = (event) => {
       setIsListening(false);
-      setSpeechStatus(event.error === "not-allowed" ? "Permita o uso do microfone para ditar a resposta." : "Não foi possível capturar a fala. Tente novamente.");
+      const messages: Record<string, string> = {
+        "not-allowed": "Permita o uso do microfone nas configurações do navegador.",
+        "service-not-allowed": "O serviço de reconhecimento de voz está bloqueado neste navegador.",
+        "audio-capture": "Nenhum microfone disponível foi encontrado.",
+        "no-speech": "Nenhuma fala foi detectada. Fale após aparecer a mensagem “Ouvindo”.",
+        network: "O serviço de voz não respondeu. Verifique a conexão e tente novamente.",
+        aborted: "O ditado por voz foi interrompido."
+      };
+      setSpeechStatus(messages[event.error] || `Não foi possível reconhecer a fala (${event.error}). Tente novamente.`);
     };
     recognition.onend = () => {
       setIsListening(false);
+      if (receivedTranscript) setSpeechStatus("Fala adicionada à resposta.");
     };
 
     recognitionRef.current = recognition;
     setSpeechStatus(null);
     setIsListening(true);
-    recognition.start();
+    try {
+      recognition.start();
+    } catch {
+      setIsListening(false);
+      setSpeechStatus("Não foi possível iniciar o microfone. Aguarde um instante e tente novamente.");
+    }
   };
 
   const stopListening = () => {
