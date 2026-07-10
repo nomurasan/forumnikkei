@@ -57,6 +57,10 @@ export default function AdminArea() {
   const [deleteError, setDeleteError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isDeletingAll, setIsDeletingAll] = useState(false);
+  const [newAdminEmail, setNewAdminEmail] = useState("");
+  const [adminUserMessage, setAdminUserMessage] = useState("");
+  const [adminUserError, setAdminUserError] = useState("");
+  const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -77,7 +81,12 @@ export default function AdminArea() {
     try {
       const emailLower = user.email?.toLowerCase() || "";
       const docRef = doc(db, "admin_users", user.uid);
+      const emailDocRef = doc(db, "admin_users", emailLower);
       let snap = await getDoc(docRef);
+
+      if (!snap.exists() && emailLower) {
+        snap = await getDoc(emailDocRef);
+      }
 
       if (!snap.exists() && BOOTSTRAP_ADMIN_EMAILS.includes(emailLower)) {
         await setDoc(docRef, {
@@ -172,6 +181,43 @@ export default function AdminArea() {
 
 
   const isAdminMaster = adminProfile?.perfil === "admin_master";
+
+  const handleCreateAdminMaster = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAdminUserMessage("");
+    setAdminUserError("");
+
+    const emailLower = newAdminEmail.trim().toLowerCase();
+    if (!emailLower) {
+      setAdminUserError("Informe um e-mail para cadastrar.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailLower)) {
+      setAdminUserError("Informe um e-mail válido.");
+      return;
+    }
+
+    setIsCreatingAdmin(true);
+    try {
+      await setDoc(doc(db, "admin_users", emailLower), {
+        uid: "",
+        nome: emailLower,
+        email: emailLower,
+        perfil: "admin_master",
+        ativo: true,
+        createdAt: new Date().toISOString(),
+        createdBy: adminProfile?.email || currentUser?.email || ""
+      }, { merge: true });
+      setNewAdminEmail("");
+      setAdminUserMessage(`${emailLower} cadastrado como admin_master.`);
+      await fetchAdminUsers();
+    } catch (err) {
+      console.error("Erro ao cadastrar admin_master:", err);
+      setAdminUserError("Não foi possível cadastrar o e-mail. Verifique se seu usuário é admin_master.");
+    } finally {
+      setIsCreatingAdmin(false);
+    }
+  };
 
   const handleDeleteSubmission = async (submission: any) => {
     if (!submission?.id || deletingId || isDeletingAll) return;
@@ -372,10 +418,32 @@ export default function AdminArea() {
       </div>
 
       <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-        <div className="mb-4 flex items-center gap-2">
-          <Users className="h-4 w-4 text-brand-red" />
-          <h3 className="text-sm font-black text-neutral-800">Usuários com acesso administrativo</h3>
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-brand-red" />
+            <h3 className="text-sm font-black text-neutral-800">Usuários com acesso administrativo</h3>
+          </div>
+          <form onSubmit={handleCreateAdminMaster} className="flex w-full flex-col gap-2 sm:flex-row lg:max-w-xl">
+            <input
+              type="email"
+              value={newAdminEmail}
+              onChange={(event) => setNewAdminEmail(event.target.value)}
+              placeholder="novo.admin@email.com"
+              disabled={!isAdminMaster || isCreatingAdmin}
+              className="min-w-0 flex-1 rounded-xl border border-neutral-200 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:bg-neutral-50 disabled:opacity-70"
+            />
+            <button
+              type="submit"
+              disabled={!isAdminMaster || isCreatingAdmin}
+              className="inline-flex items-center justify-center rounded-xl bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-red-hover disabled:cursor-not-allowed disabled:opacity-60"
+              title={isAdminMaster ? "Cadastrar admin_master" : "Apenas admin_master pode cadastrar administradores"}
+            >
+              {isCreatingAdmin ? "Cadastrando..." : "Cadastrar admin_master"}
+            </button>
+          </form>
         </div>
+        {adminUserError && <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{adminUserError}</p>}
+        {adminUserMessage && <p className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{adminUserMessage}</p>}
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead>

@@ -15,7 +15,8 @@ interface SuccessScreenProps {
 
 export default function SuccessScreen({ onReset }: SuccessScreenProps) {
   return (
-    <div className="w-full max-w-2xl mx-auto bg-white border border-neutral-200/80 rounded-2xl shadow-2xl overflow-hidden p-8 sm:p-10 text-center">
+    <div id="success-screen" className="flex min-h-[calc(100svh-11rem)] w-full items-start justify-center py-4 sm:items-center sm:py-8">
+      <div className="w-full max-w-2xl bg-white border border-neutral-200/80 rounded-2xl shadow-2xl p-8 sm:p-10 text-center">
       <div className="flex justify-center mb-4">
         <Logo variant="stacked" className="h-20" />
       </div>
@@ -30,6 +31,7 @@ export default function SuccessScreen({ onReset }: SuccessScreenProps) {
         <RefreshCw className="h-4 w-4 text-brand-red" />
         Responder novamente
       </button>
+      </div>
     </div>
   );
 }

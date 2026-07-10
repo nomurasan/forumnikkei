@@ -13,31 +13,56 @@ service cloud.firestore {
         request.auth.token.firebase.sign_in_provider == "google.com";
     }
 
-    // Helper function to check if user has active admin profile
-    function isAdmin() {
-      return isGoogleSignIn() &&
-        exists(/databases/$(database)/documents/admin_users/$(request.auth.uid)) &&
+    function hasUidAdminProfile() {
+      return exists(/databases/$(database)/documents/admin_users/$(request.auth.uid)) &&
         get(/databases/$(database)/documents/admin_users/$(request.auth.uid)).data.ativo == true &&
         get(/databases/$(database)/documents/admin_users/$(request.auth.uid)).data.email == request.auth.token.email;
     }
 
+    function hasEmailAdminProfile() {
+      return exists(/databases/$(database)/documents/admin_users/$(request.auth.token.email)) &&
+        get(/databases/$(database)/documents/admin_users/$(request.auth.token.email)).data.ativo == true &&
+        get(/databases/$(database)/documents/admin_users/$(request.auth.token.email)).data.email == request.auth.token.email;
+    }
+
+    // Helper function to check if user has active admin profile
+    function isAdmin() {
+      return isGoogleSignIn() && (hasUidAdminProfile() || hasEmailAdminProfile());
+    }
+
+    function isUidAdminMaster() {
+      return hasUidAdminProfile() &&
+        get(/databases/$(database)/documents/admin_users/$(request.auth.uid)).data.perfil == "admin_master";
+    }
+
+    function isEmailAdminMaster() {
+      return hasEmailAdminProfile() &&
+        get(/databases/$(database)/documents/admin_users/$(request.auth.token.email)).data.perfil == "admin_master";
+    }
+
     // Helper function to check if user is admin master
     function isAdminMaster() {
-      return isAdmin() && 
-        get(/databases/$(database)/documents/admin_users/$(request.auth.uid)).data.perfil == "admin_master";
+      return isGoogleSignIn() && (isUidAdminMaster() || isEmailAdminMaster());
+    }
+
+    function isValidAdminUserDocument(userId) {
+      return request.resource.data.email == userId &&
+        request.resource.data.perfil == "admin_master" &&
+        request.resource.data.ativo == true;
     }
 
     // Security rules for admin_users collection
     match /admin_users/{userId} {
-      allow read: if isAdmin() || (isGoogleSignIn() && request.auth.uid == userId);
-      allow create: if isGoogleSignIn() &&
+      allow read: if isAdmin() || (isGoogleSignIn() && (request.auth.uid == userId || request.auth.token.email == userId));
+      allow create: if (isAdminMaster() && isValidAdminUserDocument(userId)) ||
+                    (isGoogleSignIn() &&
                     request.auth.uid == userId &&
                     request.resource.data.uid == request.auth.uid &&
                     request.resource.data.email in [
                       "nomura.eduardo@gmail.com",
                       "nomura.yudas@gmail.com"
                     ] &&
-                    request.resource.data.ativo == true;
+                    request.resource.data.ativo == true);
       allow update, delete: if isAdminMaster();
     }
 

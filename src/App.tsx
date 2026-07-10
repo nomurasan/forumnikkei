@@ -400,9 +400,19 @@ export default function App() {
 
   useEffect(() => {
     if (step !== 4 && step !== 5) return;
-    window.requestAnimationFrame(() => {
+
+    const resetScroll = () => {
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
       window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-    });
+      if (step === 5) {
+        document.getElementById("success-screen")?.scrollIntoView({ behavior: "auto", block: "start" });
+      }
+    };
+
+    window.requestAnimationFrame(resetScroll);
+    const timeoutId = window.setTimeout(resetScroll, 80);
+    return () => window.clearTimeout(timeoutId);
   }, [step]);
 
   const handlePrev = () => {
@@ -452,6 +462,7 @@ export default function App() {
       } catch (e) {
         console.warn("Não foi possível limpar o rascunho:", e);
       }
+      setActiveQuestion(1);
       setStep(5);
     } catch (e) {
       console.error("Erro ao gravar no Firebase:", e);
@@ -519,7 +530,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className={`flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col ${mainAlignmentClass}`}>
+      <main key={step} className={`flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col ${mainAlignmentClass}`}>
         {step === 1 && <WelcomeScreen onStart={handleStart} hasDraft={hasDraft} draftData={draftData} />}
 
         {step > 1 && step < 5 && (
@@ -638,7 +649,7 @@ export default function App() {
                     <ChatQuestion
                       number={5}
                       icon={<Sparkles className="h-3.5 w-3.5" />}
-                      question="Quais iniciativas da REN Brasil teriam maior potencial para gerar valor para você ou sua organização nos próximos dois anos?"
+                      question="Quais iniciativas da REN Brasil podem gerar mais valor para você ou sua organização nos próximos dois anos?"
                       helper="Selecione até 3 iniciativas com maior potencial na sua visão."
                       error={errors.iniciativaPrioritariaREN}
                     >
