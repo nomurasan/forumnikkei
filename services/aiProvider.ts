@@ -67,6 +67,13 @@ async function improveWithGemini(question: string, answer: string): Promise<stri
 
 export function getAiProviderStatus() {
   const provider = (process.env.AI_PROVIDER || "gemini").toLowerCase();
+  if (provider === "gemini_openai" || provider === "auto") {
+    return {
+      provider: "gemini_openai",
+      model: `${process.env.GEMINI_MODEL || "gemini-3.5-flash"} -> ${process.env.OPENAI_MODEL || "gpt-5.4-mini"}`,
+      configured: Boolean(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY)
+    };
+  }
   if (provider === "openai") {
     return {
       provider,
@@ -86,6 +93,19 @@ export function getAiProviderStatus() {
 
 export async function improveAnswer(question: string, answer: string): Promise<string> {
   const { provider } = getAiProviderStatus();
+  if (provider === "gemini_openai") {
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        return await improveWithGemini(question, answer);
+      } catch {
+        // O conteúdo e os detalhes do erro não são registrados nem enviados ao cliente.
+      }
+    }
+    if (process.env.OPENAI_API_KEY) {
+      return improveWithOpenAI(question, answer);
+    }
+    throw new Error("Nenhum provedor de IA configurado");
+  }
   if (provider === "openai") return improveWithOpenAI(question, answer);
   if (provider === "gemini") return improveWithGemini(question, answer);
   throw new Error("AI_PROVIDER inválido");

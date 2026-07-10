@@ -16,8 +16,9 @@ View your app in AI Studio: https://ai.studio/apps/3254a6d8-da92-4dff-94d0-f1ac4
 1. Install dependencies:
    `npm install`
 2. Configure the server-only AI variables in `.env.local` (never prefix the keys with `VITE_`):
-   - Gemini: `AI_PROVIDER=gemini` and `GEMINI_API_KEY=...`
-   - OpenAI: `AI_PROVIDER=openai` and `OPENAI_API_KEY=...`
+   - Gemini com fallback para OpenAI: `AI_PROVIDER=gemini_openai`, `GEMINI_API_KEY=...` e `OPENAI_API_KEY=...`
+   - Somente Gemini: `AI_PROVIDER=gemini` e `GEMINI_API_KEY=...`
+   - Somente OpenAI: `AI_PROVIDER=openai` e `OPENAI_API_KEY=...`
 3. Run the app:
    `npm run dev`
 
