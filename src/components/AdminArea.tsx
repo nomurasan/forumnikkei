@@ -118,13 +118,28 @@ export default function AdminArea() {
       const emailLower = normalizeAdminEmail(user.email);
       const docRef = doc(db, "admin_users", user.uid);
       const emailDocRef = doc(db, "admin_users", emailLower);
-      let snap = await getDoc(docRef);
+      const candidateSnaps: any[] = [];
+      let lastReadError: unknown = null;
 
-      if (!snap.exists() && emailLower) {
-        snap = await getDoc(emailDocRef);
+      try {
+        const uidSnap = await getDoc(docRef);
+        if (uidSnap.exists()) candidateSnaps.push(uidSnap);
+      } catch (err) {
+        lastReadError = err;
+        console.warn("Nao foi possivel ler admin_user por UID:", err);
       }
 
-      if (!snap.exists() && BOOTSTRAP_ADMIN_EMAILS.includes(emailLower)) {
+      if (emailLower) {
+        try {
+          const emailSnap = await getDoc(emailDocRef);
+          if (emailSnap.exists()) candidateSnaps.push(emailSnap);
+        } catch (err) {
+          lastReadError = err;
+          console.warn("Nao foi possivel ler admin_user por e-mail:", err);
+        }
+      }
+
+      if (!candidateSnaps.length && BOOTSTRAP_ADMIN_EMAILS.includes(emailLower)) {
         await setDoc(docRef, {
           uid: user.uid,
           nome: user.displayName || emailLower,
@@ -133,13 +148,20 @@ export default function AdminArea() {
           ativo: true,
           createdAt: serverTimestamp()
         });
-        snap = await getDoc(docRef);
+        const bootstrapSnap = await getDoc(docRef);
+        if (bootstrapSnap.exists()) candidateSnaps.push(bootstrapSnap);
       }
 
-      const profile = snap.exists() ? normalizeAdminUser(snap.id, snap.data()) : null;
-      const hasAdminAccess = isValidAdminProfile(profile, emailLower);
+      if (!candidateSnaps.length && lastReadError) {
+        throw lastReadError;
+      }
 
-      if (hasAdminAccess) {
+      const adminMatch = candidateSnaps
+        .map((snap) => ({ snap, profile: normalizeAdminUser(snap.id, snap.data()) }))
+        .find(({ profile }) => isValidAdminProfile(profile, emailLower));
+
+      if (adminMatch) {
+        const { snap, profile } = adminMatch;
         if (snap.id !== user.uid || profile.uid !== user.uid || profile.nome === emailLower) {
           try {
             const canonicalProfile = {
@@ -152,9 +174,6 @@ export default function AdminArea() {
               updatedAt: serverTimestamp()
             };
             await setDoc(docRef, canonicalProfile, { merge: true });
-            if (snap.id !== user.uid) {
-              await deleteDoc(doc(db, "admin_users", snap.id));
-            }
             profile.uid = user.uid;
             profile.nome = canonicalProfile.nome;
           } catch (migrationErr) {
@@ -165,13 +184,13 @@ export default function AdminArea() {
         setAdminProfile(profile);
         await Promise.all([fetchSubmissions(), fetchAdminUsers()]);
       } else {
-        setAuthError("Este e-mail não está cadastrado como administrador ativo do painel.");
+        setAuthError("Este e-mail nï¿½o estï¿½ cadastrado como administrador ativo do painel.");
         await signOut(auth);
         setCurrentUser(null);
       }
     } catch (err) {
       console.error("Erro ao validar acesso administrativo:", err);
-      setAuthError("Não foi possível validar o acesso administrativo.");
+      setAuthError("Nï¿½o foi possï¿½vel validar o acesso administrativo.");
     } finally {
       setCheckingAccess(false);
       setLoading(false);
@@ -199,7 +218,15 @@ export default function AdminArea() {
   const fetchAdminUsers = async () => {
     try {
       const snap = await getDocs(collection(db, "admin_users"));
-      const users = snap.docs.map((docSnap) => normalizeAdminUser(docSnap.id, docSnap.data()));
+      const usersByEmail = new Map<string, AdminUser>();
+      snap.docs.forEach((docSnap) => {
+        const user = normalizeAdminUser(docSnap.id, docSnap.data());
+        const existing = usersByEmail.get(user.email);
+        if (!existing || existing.uid === user.email) {
+          usersByEmail.set(user.email, user);
+        }
+      });
+      const users = Array.from(usersByEmail.values());
       users.sort((a, b) => a.email.localeCompare(b.email));
       setAdminUsers(users);
     } catch (err) {
@@ -249,7 +276,7 @@ export default function AdminArea() {
       return;
     }
     if (!ADMIN_EMAIL_PATTERN.test(emailLower)) {
-      setAdminUserError("Informe um e-mail válido.");
+      setAdminUserError("Informe um e-mail vï¿½lido.");
       return;
     }
 
@@ -269,7 +296,7 @@ export default function AdminArea() {
       await fetchAdminUsers();
     } catch (err) {
       console.error("Erro ao cadastrar admin_master:", err);
-      setAdminUserError("Não foi possível cadastrar o e-mail. Verifique se seu usuário é admin_master.");
+      setAdminUserError("Nï¿½o foi possï¿½vel cadastrar o e-mail. Verifique se seu usuï¿½rio ï¿½ admin_master.");
     } finally {
       setIsCreatingAdmin(false);
     }
@@ -282,7 +309,7 @@ export default function AdminArea() {
 
     const currentEmail = (adminProfile?.email || currentUser?.email || "").toLowerCase();
     if (user.email?.toLowerCase() === currentEmail) {
-      setAdminUserError("Você não pode excluir o próprio acesso administrativo enquanto estiver logado.");
+      setAdminUserError("Vocï¿½ nï¿½o pode excluir o prï¿½prio acesso administrativo enquanto estiver logado.");
       return;
     }
 
@@ -296,7 +323,7 @@ export default function AdminArea() {
       await fetchAdminUsers();
     } catch (err) {
       console.error("Erro ao remover admin_master:", err);
-      setAdminUserError("Não foi possível excluir o e-mail. Verifique se seu usuário é admin_master.");
+      setAdminUserError("Nï¿½o foi possï¿½vel excluir o e-mail. Verifique se seu usuï¿½rio ï¿½ admin_master.");
     } finally {
       setRemovingAdminId(null);
     }
@@ -305,7 +332,7 @@ export default function AdminArea() {
   const handleDeleteSubmission = async (submission: any) => {
     if (!submission?.id || deletingId || isDeletingAll) return;
     setDeleteError("");
-    const confirmed = window.confirm("Apagar esta resposta? Esta ação não pode ser desfeita.");
+    const confirmed = window.confirm("Apagar esta resposta? Esta aï¿½ï¿½o nï¿½o pode ser desfeita.");
     if (!confirmed) return;
 
     setDeletingId(submission.id);
@@ -319,7 +346,7 @@ export default function AdminArea() {
       });
     } catch (err) {
       console.error("Erro ao apagar resposta:", err);
-      setDeleteError("Não foi possível apagar a resposta. Verifique se seu usuário é admin_master.");
+      setDeleteError("Nï¿½o foi possï¿½vel apagar a resposta. Verifique se seu usuï¿½rio ï¿½ admin_master.");
     } finally {
       setDeletingId(null);
     }
@@ -328,12 +355,12 @@ export default function AdminArea() {
   const handleDeleteAllSubmissions = async () => {
     if (!submissions.length || isDeletingAll || deletingId) return;
     setDeleteError("");
-    const confirmed = window.confirm(`Apagar TODAS as ${submissions.length} respostas? Esta ação não pode ser desfeita.`);
+    const confirmed = window.confirm(`Apagar TODAS as ${submissions.length} respostas? Esta aï¿½ï¿½o nï¿½o pode ser desfeita.`);
     if (!confirmed) return;
 
     setIsDeletingAll(true);
     try {
-      // O Firestore limita cada lote a 500 operações.
+      // O Firestore limita cada lote a 500 operaï¿½ï¿½es.
       for (let offset = 0; offset < submissions.length; offset += 500) {
         const batch = writeBatch(db);
         submissions.slice(offset, offset + 500).forEach((item) => {
@@ -345,7 +372,7 @@ export default function AdminArea() {
       setSelectedSubmission(null);
     } catch (err) {
       console.error("Erro ao apagar todas as respostas:", err);
-      setDeleteError("Não foi possível apagar todos os registros. Verifique se seu usuário é admin_master.");
+      setDeleteError("Nï¿½o foi possï¿½vel apagar todos os registros. Verifique se seu usuï¿½rio ï¿½ admin_master.");
       await fetchSubmissions();
     } finally {
       setIsDeletingAll(false);
@@ -393,7 +420,7 @@ export default function AdminArea() {
   const activityCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     submissions.forEach((item) => {
-      const key = item.atividadeMaiorValor || "Não informado";
+      const key = item.atividadeMaiorValor || "Nï¿½o informado";
       counts[key] = (counts[key] || 0) + 1;
     });
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
@@ -403,7 +430,7 @@ export default function AdminArea() {
     const counts: Record<string, number> = {};
     submissions.forEach((item) => {
       const values = toValueList(item.iniciativaPrioritariaREN);
-      const keys = values.length ? values : ["Não informado"];
+      const keys = values.length ? values : ["Nï¿½o informado"];
       keys.forEach((key) => {
         counts[key] = (counts[key] || 0) + 1;
       });
@@ -450,7 +477,7 @@ export default function AdminArea() {
         </div>
         <div>
           <h2 className="text-lg font-black text-neutral-800">Validando acesso</h2>
-          <p className="mt-1 text-sm text-neutral-500">Estamos verificando se o e-mail selecionado é administrador ativo.</p>
+          <p className="mt-1 text-sm text-neutral-500">Estamos verificando se o e-mail selecionado ï¿½ administrador ativo.</p>
         </div>
       </div>
     );
@@ -482,7 +509,7 @@ export default function AdminArea() {
       <div className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-brand-red">Painel administrativo</p>
-          <h2 className="text-xl font-black text-neutral-800">Resumo das respostas do questionário</h2>
+          <h2 className="text-xl font-black text-neutral-800">Resumo das respostas do questionï¿½rio</h2>
           <p className="mt-1 text-xs text-neutral-500">Acesso liberado para {adminProfile?.email || currentUser.email}</p>
         </div>
         <button type="button" onClick={handleLogout} className="inline-flex items-center gap-2 rounded-xl border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-700">
@@ -497,7 +524,7 @@ export default function AdminArea() {
           <p className="mt-2 text-2xl font-black text-neutral-800">{submissions.length}</p>
         </div>
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-          <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Usuários admin</p>
+          <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Usuï¿½rios admin</p>
           <p className="mt-2 text-2xl font-black text-neutral-800">{adminUsers.length}</p>
         </div>
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
@@ -505,7 +532,7 @@ export default function AdminArea() {
           <p className="mt-2 text-lg font-black text-neutral-800">{topActivity}</p>
         </div>
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-          <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Média de chance de aplicar</p>
+          <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Mï¿½dia de chance de aplicar</p>
           <p className="mt-2 text-2xl font-black text-neutral-800">{averageProbability}</p>
         </div>
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
@@ -519,7 +546,7 @@ export default function AdminArea() {
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-brand-red" />
             <div>
-              <h3 className="text-sm font-black text-neutral-800">Usuários com acesso administrativo</h3>
+              <h3 className="text-sm font-black text-neutral-800">Usuï¿½rios com acesso administrativo</h3>
               <p className="mt-1 text-xs text-neutral-500">Cadastre ou exclua e-mails autorizados a atuar como admin_master.</p>
             </div>
           </div>
@@ -566,7 +593,7 @@ export default function AdminArea() {
               ))}
               {!adminUsers.length && (
                 <tr>
-                  <td className="py-3 pr-4 text-neutral-500" colSpan={5}>Nenhum usuário administrativo encontrado.</td>
+                  <td className="py-3 pr-4 text-neutral-500" colSpan={5}>Nenhum usuï¿½rio administrativo encontrado.</td>
                 </tr>
               )}
             </tbody>
@@ -578,7 +605,7 @@ export default function AdminArea() {
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm xl:col-span-1">
           <div className="mb-3 flex items-center gap-2">
             <BarChart3 className="h-4 w-4 text-brand-red" />
-            <h3 className="text-sm font-black text-neutral-800">Atividade do Fórum</h3>
+            <h3 className="text-sm font-black text-neutral-800">Atividade do Fï¿½rum</h3>
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -684,14 +711,14 @@ export default function AdminArea() {
                   <p className="mt-1 whitespace-pre-wrap text-sm text-neutral-700">{item.principalAprendizado || "Sem resposta"}</p>
                 </div>
                 <div className="rounded-lg bg-neutral-50 p-3">
-                  <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Aplicação</p>
+                  <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Aplicaï¿½ï¿½o</p>
                   <p className="mt-1 text-sm text-neutral-700">Chance de aplicar: {formatProbabilityLabel(item.probabilidadeAplicacao)}</p>
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Prática: {item.praticaPretendeAplicar || "Sem resposta"}</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Prï¿½tica: {item.praticaPretendeAplicar || "Sem resposta"}</p>
                 </div>
                 <div className="rounded-lg bg-neutral-50 p-3">
-                  <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Recomendações</p>
-                  <p className="mt-1 text-sm text-neutral-700">Iniciativas prioritárias: {formatDisplayValue(item.iniciativaPrioritariaREN) || "-"}</p>
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Proposta estratégica: {item.recomendacaoEstrategicaREN || "Sem resposta"}</p>
+                  <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Recomendaï¿½ï¿½es</p>
+                  <p className="mt-1 text-sm text-neutral-700">Iniciativas prioritï¿½rias: {formatDisplayValue(item.iniciativaPrioritariaREN) || "-"}</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Proposta estratï¿½gica: {item.recomendacaoEstrategicaREN || "Sem resposta"}</p>
                 </div>
               </div>
             </div>
@@ -708,7 +735,7 @@ export default function AdminArea() {
                 <th className="py-2 pr-4">Aprendizado</th>
                 <th className="py-2 pr-4">Chance de aplicar</th>
                 <th className="py-2 pr-4">Iniciativa</th>
-                <th className="py-2 pr-4 text-right">Ações</th>
+                <th className="py-2 pr-4 text-right">Aï¿½ï¿½es</th>
               </tr>
             </thead>
             <tbody>
@@ -765,14 +792,14 @@ export default function AdminArea() {
               <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">{selectedSubmission.principalAprendizado || "Sem resposta"}</p>
             </div>
             <div className="rounded-xl bg-neutral-50 p-4">
-              <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Aplicação</p>
+              <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Aplicaï¿½ï¿½o</p>
               <p className="mt-2 text-sm text-neutral-700">Chance de aplicar: {formatProbabilityLabel(selectedSubmission.probabilidadeAplicacao)}</p>
-              <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Prática: {selectedSubmission.praticaPretendeAplicar || "Sem resposta"}</p>
+              <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Prï¿½tica: {selectedSubmission.praticaPretendeAplicar || "Sem resposta"}</p>
             </div>
             <div className="rounded-xl bg-neutral-50 p-4 md:col-span-2">
-              <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Recomendações</p>
-              <p className="mt-2 text-sm text-neutral-700">Iniciativas prioritárias: {formatDisplayValue(selectedSubmission.iniciativaPrioritariaREN) || "-"}</p>
-              <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Proposta estratégica: {selectedSubmission.recomendacaoEstrategicaREN || "Sem resposta"}</p>
+              <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Recomendaï¿½ï¿½es</p>
+              <p className="mt-2 text-sm text-neutral-700">Iniciativas prioritï¿½rias: {formatDisplayValue(selectedSubmission.iniciativaPrioritariaREN) || "-"}</p>
+              <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Proposta estratï¿½gica: {selectedSubmission.recomendacaoEstrategicaREN || "Sem resposta"}</p>
             </div>
           </div>
         </div>
