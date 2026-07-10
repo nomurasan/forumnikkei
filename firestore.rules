@@ -13,16 +13,20 @@ service cloud.firestore {
         request.auth.token.firebase.sign_in_provider == "google.com";
     }
 
+    function authEmailLower() {
+      return request.auth.token.email.lower();
+    }
+
     function hasUidAdminProfile() {
       return exists(/databases/$(database)/documents/admin_users/$(request.auth.uid)) &&
         get(/databases/$(database)/documents/admin_users/$(request.auth.uid)).data.ativo == true &&
-        get(/databases/$(database)/documents/admin_users/$(request.auth.uid)).data.email == request.auth.token.email;
+        get(/databases/$(database)/documents/admin_users/$(request.auth.uid)).data.email.lower() == authEmailLower();
     }
 
     function hasEmailAdminProfile() {
-      return exists(/databases/$(database)/documents/admin_users/$(request.auth.token.email)) &&
-        get(/databases/$(database)/documents/admin_users/$(request.auth.token.email)).data.ativo == true &&
-        get(/databases/$(database)/documents/admin_users/$(request.auth.token.email)).data.email == request.auth.token.email;
+      return exists(/databases/$(database)/documents/admin_users/$(authEmailLower())) &&
+        get(/databases/$(database)/documents/admin_users/$(authEmailLower())).data.ativo == true &&
+        get(/databases/$(database)/documents/admin_users/$(authEmailLower())).data.email.lower() == authEmailLower();
     }
 
     // Helper function to check if user has active admin profile
@@ -61,12 +65,12 @@ service cloud.firestore {
 
     // Security rules for admin_users collection
     match /admin_users/{userId} {
-      allow read: if isAdmin() || (isGoogleSignIn() && (request.auth.uid == userId || request.auth.token.email == userId));
+      allow read: if isAdmin() || (isGoogleSignIn() && (request.auth.uid == userId || authEmailLower() == userId.lower()));
       allow create: if (isAdminMaster() && isValidAdminUserDocument(userId)) ||
                     (isGoogleSignIn() &&
                     request.auth.uid == userId &&
                     request.resource.data.uid == request.auth.uid &&
-                    request.resource.data.email in [
+                    request.resource.data.email.lower() in [
                       "nomura.eduardo@gmail.com",
                       "nomura.yudas@gmail.com"
                     ] &&

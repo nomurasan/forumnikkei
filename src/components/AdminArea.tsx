@@ -215,7 +215,12 @@ export default function AdminArea() {
       }
     } catch (err) {
       console.error("Erro ao validar acesso administrativo:", err);
-      setAuthError("Não foi possível validar o acesso administrativo.");
+      const errorCode = (err as any)?.code;
+      if (errorCode === "permission-denied") {
+        setAuthError("Acesso negado ao validar administrador. Verifique as regras do Firestore para admin_users.");
+      } else {
+        setAuthError("Não foi possível validar o acesso administrativo.");
+      }
     } finally {
       setCheckingAccess(false);
       setLoading(false);
