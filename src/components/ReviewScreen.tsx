@@ -23,32 +23,32 @@ export default function ReviewScreen({ data, onJumpToQuestion }: ReviewScreenPro
   const sections = [
     {
       title: "Atividade de maior valor",
-      step: 2,
+      questionNumber: 1,
       value: data.atividadeMaiorValor || "Não respondido"
     },
     {
       title: "Principal aprendizado",
-      step: 2,
+      questionNumber: 2,
       value: data.principalAprendizado || "Não respondido"
     },
     {
       title: "Probabilidade de aplicação",
-      step: 2,
+      questionNumber: 3,
       value: data.probabilidadeAplicacao ? `${data.probabilidadeAplicacao} / 5` : "Não respondido"
     },
     {
       title: "Prática que pretende aplicar",
-      step: 3,
+      questionNumber: 4,
       value: data.praticaPretendeAplicar || "Não respondido"
     },
     {
       title: "Iniciativas prioritárias da REN",
-      step: 3,
+      questionNumber: 5,
       value: formatListValue(data.iniciativaPrioritariaREN)
     },
     {
       title: "Recomendação estratégica",
-      step: 3,
+      questionNumber: 6,
       value: data.recomendacaoEstrategicaREN || "Não respondido"
     }
   ];
