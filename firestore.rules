@@ -45,8 +45,16 @@ service cloud.firestore {
       return isGoogleSignIn() && (isUidAdminMaster() || isEmailAdminMaster());
     }
 
+    function isValidAdminEmail(email) {
+      return email is string && email.matches(".*@.*[.].*");
+    }
+
     function isValidAdminUserDocument(userId) {
-      return request.resource.data.email == userId &&
+      return request.resource.data.keys().hasAll(["uid", "nome", "email", "perfil", "ativo", "createdAt"]) &&
+        request.resource.data.uid is string &&
+        request.resource.data.nome is string &&
+        isValidAdminEmail(request.resource.data.email) &&
+        (request.resource.data.email == userId || request.resource.data.uid == userId) &&
         request.resource.data.perfil == "admin_master" &&
         request.resource.data.ativo == true;
     }

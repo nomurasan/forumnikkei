@@ -1,4 +1,4 @@
-Ôªø/**
+/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -7,9 +7,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import { BarChart3, Download, LogIn, LogOut, Search, Shield, Sparkles, Trash2, Users } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, Legend } from "recharts";
 import { PROBABILIDADE_APLICACAO_OPTIONS } from "../types";
-import { auth, db, collection, deleteDoc, doc, getDoc, getDocs, setDoc, signOut, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, writeBatch } from "../lib/firebase";
+import { auth, db, collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, signOut, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, writeBatch } from "../lib/firebase";
 
 const BOOTSTRAP_ADMIN_EMAILS = ["nomura.eduardo@gmail.com", "nomura.yudas@gmail.com"];
+const ADMIN_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 interface AdminUser {
   uid: string;
@@ -33,6 +34,29 @@ function formatCSVValue(value: unknown): string {
   if (typeof (value as any)?.seconds === "number") return new Date((value as any).seconds * 1000).toISOString();
   if (Array.isArray(value)) return value.join("; ");
   return String(value);
+}
+function normalizeAdminEmail(value: unknown): string {
+  return String(value || "").trim().toLowerCase();
+}
+
+function normalizeAdminUser(docId: string, data: any): AdminUser {
+  const email = normalizeAdminEmail(data?.email || docId);
+  return {
+    uid: String(data?.uid || docId || email),
+    nome: String(data?.nome || email),
+    email,
+    perfil: String(data?.perfil || ""),
+    ativo: data?.ativo === true
+  };
+}
+
+function isValidAdminProfile(profile: AdminUser | null, signedInEmail: string): profile is AdminUser {
+  return !!profile &&
+    profile.ativo === true &&
+    profile.perfil === "admin_master" &&
+    ADMIN_EMAIL_PATTERN.test(profile.email) &&
+    profile.email === signedInEmail &&
+    !!profile.uid;
 }
 function formatDisplayValue(value: unknown): string {
   if (value === null || value === undefined) return "";
@@ -91,7 +115,7 @@ export default function AdminArea() {
   const ensureAdminAccess = async (user: any) => {
     setCheckingAccess(true);
     try {
-      const emailLower = user.email?.toLowerCase() || "";
+      const emailLower = normalizeAdminEmail(user.email);
       const docRef = doc(db, "admin_users", user.uid);
       const emailDocRef = doc(db, "admin_users", emailLower);
       let snap = await getDoc(docRef);
@@ -107,7 +131,7 @@ export default function AdminArea() {
           email: emailLower,
           perfil: "admin_master",
           ativo: true,
-          createdAt: new Date().toISOString()
+          createdAt: serverTimestamp()
         });
         snap = await getDoc(docRef);
       }
@@ -121,13 +145,13 @@ export default function AdminArea() {
         setAdminProfile(profile);
         await Promise.all([fetchSubmissions(), fetchAdminUsers()]);
       } else {
-        setAuthError("Este e-mail n√£o est√° cadastrado como administrador ativo do painel.");
+        setAuthError("Este e-mail n„o est· cadastrado como administrador ativo do painel.");
         await signOut(auth);
         setCurrentUser(null);
       }
     } catch (err) {
       console.error("Erro ao validar acesso administrativo:", err);
-      setAuthError("N√£o foi poss√≠vel validar o acesso administrativo.");
+      setAuthError("N„o foi possÌvel validar o acesso administrativo.");
     } finally {
       setCheckingAccess(false);
       setLoading(false);
@@ -155,7 +179,7 @@ export default function AdminArea() {
   const fetchAdminUsers = async () => {
     try {
       const snap = await getDocs(collection(db, "admin_users"));
-      const users = snap.docs.map((docSnap) => ({ uid: docSnap.id, ...docSnap.data() }) as AdminUser);
+      const users = snap.docs.map((docSnap) => normalizeAdminUser(docSnap.id, docSnap.data()));
       users.sort((a, b) => a.email.localeCompare(b.email));
       setAdminUsers(users);
     } catch (err) {
@@ -199,25 +223,25 @@ export default function AdminArea() {
     setAdminUserMessage("");
     setAdminUserError("");
 
-    const emailLower = newAdminEmail.trim().toLowerCase();
+    const emailLower = normalizeAdminEmail(newAdminEmail);
     if (!emailLower) {
       setAdminUserError("Informe um e-mail para cadastrar.");
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailLower)) {
-      setAdminUserError("Informe um e-mail v√°lido.");
+    if (!ADMIN_EMAIL_PATTERN.test(emailLower)) {
+      setAdminUserError("Informe um e-mail v·lido.");
       return;
     }
 
     setIsCreatingAdmin(true);
     try {
       await setDoc(doc(db, "admin_users", emailLower), {
-        uid: "",
+        uid: emailLower,
         nome: emailLower,
         email: emailLower,
         perfil: "admin_master",
         ativo: true,
-        createdAt: new Date().toISOString(),
+        createdAt: serverTimestamp(),
         createdBy: adminProfile?.email || currentUser?.email || ""
       }, { merge: true });
       setNewAdminEmail("");
@@ -225,7 +249,7 @@ export default function AdminArea() {
       await fetchAdminUsers();
     } catch (err) {
       console.error("Erro ao cadastrar admin_master:", err);
-      setAdminUserError("N√£o foi poss√≠vel cadastrar o e-mail. Verifique se seu usu√°rio √© admin_master.");
+      setAdminUserError("N„o foi possÌvel cadastrar o e-mail. Verifique se seu usu·rio È admin_master.");
     } finally {
       setIsCreatingAdmin(false);
     }
@@ -238,7 +262,7 @@ export default function AdminArea() {
 
     const currentEmail = (adminProfile?.email || currentUser?.email || "").toLowerCase();
     if (user.email?.toLowerCase() === currentEmail) {
-      setAdminUserError("Voc√™ n√£o pode excluir o pr√≥prio acesso administrativo enquanto estiver logado.");
+      setAdminUserError("VocÍ n„o pode excluir o prÛprio acesso administrativo enquanto estiver logado.");
       return;
     }
 
@@ -252,7 +276,7 @@ export default function AdminArea() {
       await fetchAdminUsers();
     } catch (err) {
       console.error("Erro ao remover admin_master:", err);
-      setAdminUserError("N√£o foi poss√≠vel excluir o e-mail. Verifique se seu usu√°rio √© admin_master.");
+      setAdminUserError("N„o foi possÌvel excluir o e-mail. Verifique se seu usu·rio È admin_master.");
     } finally {
       setRemovingAdminId(null);
     }
@@ -261,7 +285,7 @@ export default function AdminArea() {
   const handleDeleteSubmission = async (submission: any) => {
     if (!submission?.id || deletingId || isDeletingAll) return;
     setDeleteError("");
-    const confirmed = window.confirm("Apagar esta resposta? Esta a√ß√£o n√£o pode ser desfeita.");
+    const confirmed = window.confirm("Apagar esta resposta? Esta aÁ„o n„o pode ser desfeita.");
     if (!confirmed) return;
 
     setDeletingId(submission.id);
@@ -275,7 +299,7 @@ export default function AdminArea() {
       });
     } catch (err) {
       console.error("Erro ao apagar resposta:", err);
-      setDeleteError("N√£o foi poss√≠vel apagar a resposta. Verifique se seu usu√°rio √© admin_master.");
+      setDeleteError("N„o foi possÌvel apagar a resposta. Verifique se seu usu·rio È admin_master.");
     } finally {
       setDeletingId(null);
     }
@@ -284,12 +308,12 @@ export default function AdminArea() {
   const handleDeleteAllSubmissions = async () => {
     if (!submissions.length || isDeletingAll || deletingId) return;
     setDeleteError("");
-    const confirmed = window.confirm(`Apagar TODAS as ${submissions.length} respostas? Esta a√ß√£o n√£o pode ser desfeita.`);
+    const confirmed = window.confirm(`Apagar TODAS as ${submissions.length} respostas? Esta aÁ„o n„o pode ser desfeita.`);
     if (!confirmed) return;
 
     setIsDeletingAll(true);
     try {
-      // O Firestore limita cada lote a 500 opera√ß√µes.
+      // O Firestore limita cada lote a 500 operaÁıes.
       for (let offset = 0; offset < submissions.length; offset += 500) {
         const batch = writeBatch(db);
         submissions.slice(offset, offset + 500).forEach((item) => {
@@ -301,7 +325,7 @@ export default function AdminArea() {
       setSelectedSubmission(null);
     } catch (err) {
       console.error("Erro ao apagar todas as respostas:", err);
-      setDeleteError("N√£o foi poss√≠vel apagar todos os registros. Verifique se seu usu√°rio √© admin_master.");
+      setDeleteError("N„o foi possÌvel apagar todos os registros. Verifique se seu usu·rio È admin_master.");
       await fetchSubmissions();
     } finally {
       setIsDeletingAll(false);
@@ -349,7 +373,7 @@ export default function AdminArea() {
   const activityCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     submissions.forEach((item) => {
-      const key = item.atividadeMaiorValor || "N√£o informado";
+      const key = item.atividadeMaiorValor || "N„o informado";
       counts[key] = (counts[key] || 0) + 1;
     });
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
@@ -359,7 +383,7 @@ export default function AdminArea() {
     const counts: Record<string, number> = {};
     submissions.forEach((item) => {
       const values = toValueList(item.iniciativaPrioritariaREN);
-      const keys = values.length ? values : ["N√£o informado"];
+      const keys = values.length ? values : ["N„o informado"];
       keys.forEach((key) => {
         counts[key] = (counts[key] || 0) + 1;
       });
@@ -406,7 +430,7 @@ export default function AdminArea() {
         </div>
         <div>
           <h2 className="text-lg font-black text-neutral-800">Validando acesso</h2>
-          <p className="mt-1 text-sm text-neutral-500">Estamos verificando se o e-mail selecionado √© administrador ativo.</p>
+          <p className="mt-1 text-sm text-neutral-500">Estamos verificando se o e-mail selecionado È administrador ativo.</p>
         </div>
       </div>
     );
@@ -438,7 +462,7 @@ export default function AdminArea() {
       <div className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-brand-red">Painel administrativo</p>
-          <h2 className="text-xl font-black text-neutral-800">Resumo das respostas do question√°rio</h2>
+          <h2 className="text-xl font-black text-neutral-800">Resumo das respostas do question·rio</h2>
           <p className="mt-1 text-xs text-neutral-500">Acesso liberado para {adminProfile?.email || currentUser.email}</p>
         </div>
         <button type="button" onClick={handleLogout} className="inline-flex items-center gap-2 rounded-xl border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-700">
@@ -453,7 +477,7 @@ export default function AdminArea() {
           <p className="mt-2 text-2xl font-black text-neutral-800">{submissions.length}</p>
         </div>
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-          <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Usu√°rios admin</p>
+          <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Usu·rios admin</p>
           <p className="mt-2 text-2xl font-black text-neutral-800">{adminUsers.length}</p>
         </div>
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
@@ -461,7 +485,7 @@ export default function AdminArea() {
           <p className="mt-2 text-lg font-black text-neutral-800">{topActivity}</p>
         </div>
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-          <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">M√©dia de chance de aplicar</p>
+          <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">MÈdia de chance de aplicar</p>
           <p className="mt-2 text-2xl font-black text-neutral-800">{averageProbability}</p>
         </div>
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
@@ -475,7 +499,7 @@ export default function AdminArea() {
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-brand-red" />
             <div>
-              <h3 className="text-sm font-black text-neutral-800">Usu√°rios com acesso administrativo</h3>
+              <h3 className="text-sm font-black text-neutral-800">Usu·rios com acesso administrativo</h3>
               <p className="mt-1 text-xs text-neutral-500">Cadastre ou exclua e-mails autorizados a atuar como admin_master.</p>
             </div>
           </div>
@@ -522,7 +546,7 @@ export default function AdminArea() {
               ))}
               {!adminUsers.length && (
                 <tr>
-                  <td className="py-3 pr-4 text-neutral-500" colSpan={5}>Nenhum usu√°rio administrativo encontrado.</td>
+                  <td className="py-3 pr-4 text-neutral-500" colSpan={5}>Nenhum usu·rio administrativo encontrado.</td>
                 </tr>
               )}
             </tbody>
@@ -534,7 +558,7 @@ export default function AdminArea() {
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm xl:col-span-1">
           <div className="mb-3 flex items-center gap-2">
             <BarChart3 className="h-4 w-4 text-brand-red" />
-            <h3 className="text-sm font-black text-neutral-800">Atividade do F√≥rum</h3>
+            <h3 className="text-sm font-black text-neutral-800">Atividade do FÛrum</h3>
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -640,14 +664,14 @@ export default function AdminArea() {
                   <p className="mt-1 whitespace-pre-wrap text-sm text-neutral-700">{item.principalAprendizado || "Sem resposta"}</p>
                 </div>
                 <div className="rounded-lg bg-neutral-50 p-3">
-                  <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Aplica√ß√£o</p>
+                  <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">AplicaÁ„o</p>
                   <p className="mt-1 text-sm text-neutral-700">Chance de aplicar: {formatProbabilityLabel(item.probabilidadeAplicacao)}</p>
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Pr√°tica: {item.praticaPretendeAplicar || "Sem resposta"}</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Pr·tica: {item.praticaPretendeAplicar || "Sem resposta"}</p>
                 </div>
                 <div className="rounded-lg bg-neutral-50 p-3">
-                  <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Recomenda√ß√µes</p>
-                  <p className="mt-1 text-sm text-neutral-700">Iniciativas priorit√°rias: {formatDisplayValue(item.iniciativaPrioritariaREN) || "-"}</p>
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Proposta estrat√©gica: {item.recomendacaoEstrategicaREN || "Sem resposta"}</p>
+                  <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">RecomendaÁıes</p>
+                  <p className="mt-1 text-sm text-neutral-700">Iniciativas priorit·rias: {formatDisplayValue(item.iniciativaPrioritariaREN) || "-"}</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Proposta estratÈgica: {item.recomendacaoEstrategicaREN || "Sem resposta"}</p>
                 </div>
               </div>
             </div>
@@ -664,7 +688,7 @@ export default function AdminArea() {
                 <th className="py-2 pr-4">Aprendizado</th>
                 <th className="py-2 pr-4">Chance de aplicar</th>
                 <th className="py-2 pr-4">Iniciativa</th>
-                <th className="py-2 pr-4 text-right">A√ß√µes</th>
+                <th className="py-2 pr-4 text-right">AÁıes</th>
               </tr>
             </thead>
             <tbody>
@@ -721,14 +745,14 @@ export default function AdminArea() {
               <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">{selectedSubmission.principalAprendizado || "Sem resposta"}</p>
             </div>
             <div className="rounded-xl bg-neutral-50 p-4">
-              <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Aplica√ß√£o</p>
+              <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">AplicaÁ„o</p>
               <p className="mt-2 text-sm text-neutral-700">Chance de aplicar: {formatProbabilityLabel(selectedSubmission.probabilidadeAplicacao)}</p>
-              <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Pr√°tica: {selectedSubmission.praticaPretendeAplicar || "Sem resposta"}</p>
+              <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Pr·tica: {selectedSubmission.praticaPretendeAplicar || "Sem resposta"}</p>
             </div>
             <div className="rounded-xl bg-neutral-50 p-4 md:col-span-2">
-              <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Recomenda√ß√µes</p>
-              <p className="mt-2 text-sm text-neutral-700">Iniciativas priorit√°rias: {formatDisplayValue(selectedSubmission.iniciativaPrioritariaREN) || "-"}</p>
-              <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Proposta estrat√©gica: {selectedSubmission.recomendacaoEstrategicaREN || "Sem resposta"}</p>
+              <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">RecomendaÁıes</p>
+              <p className="mt-2 text-sm text-neutral-700">Iniciativas priorit·rias: {formatDisplayValue(selectedSubmission.iniciativaPrioritariaREN) || "-"}</p>
+              <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">Proposta estratÈgica: {selectedSubmission.recomendacaoEstrategicaREN || "Sem resposta"}</p>
             </div>
           </div>
         </div>
