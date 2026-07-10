@@ -136,11 +136,31 @@ export default function AdminArea() {
         snap = await getDoc(docRef);
       }
 
-      const profile = snap.exists() ? (snap.data() as AdminUser) : null;
-      const profileEmail = profile?.email?.toLowerCase() || "";
-      const hasAdminAccess = !!profile && profile.ativo && profileEmail === emailLower;
+      const profile = snap.exists() ? normalizeAdminUser(snap.id, snap.data()) : null;
+      const hasAdminAccess = isValidAdminProfile(profile, emailLower);
 
       if (hasAdminAccess) {
+        if (snap.id !== user.uid || profile.uid !== user.uid || profile.nome === emailLower) {
+          try {
+            const canonicalProfile = {
+              uid: user.uid,
+              nome: user.displayName || profile.nome || emailLower,
+              email: emailLower,
+              perfil: "admin_master",
+              ativo: true,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp()
+            };
+            await setDoc(docRef, canonicalProfile, { merge: true });
+            if (snap.id !== user.uid) {
+              await deleteDoc(doc(db, "admin_users", snap.id));
+            }
+            profile.uid = user.uid;
+            profile.nome = canonicalProfile.nome;
+          } catch (migrationErr) {
+            console.warn("Nao foi possivel consolidar admin_user por UID:", migrationErr);
+          }
+        }
         setCurrentUser(user);
         setAdminProfile(profile);
         await Promise.all([fetchSubmissions(), fetchAdminUsers()]);
@@ -392,12 +412,12 @@ export default function AdminArea() {
   }, [submissions]);
 
   const probabilityCounts = useMemo(() => {
-    return [1, 2, 3, 4, 5].map((value) => ({
-      name: `${value}`,
-      value: submissions.filter((item) => Number(item.probabilidadeAplicacao) === value).length
+    return PROBABILIDADE_APLICACAO_OPTIONS.map((option) => ({
+      name: option.label,
+      shortName: `${option.value}`,
+      value: submissions.filter((item) => Number(item.probabilidadeAplicacao) === option.value).length
     }));
   }, [submissions]);
-
   const averageProbability = useMemo(() => {
     if (!submissions.length) return 0;
     const sum = submissions.reduce((acc, item) => acc + (Number(item.probabilidadeAplicacao) || 0), 0);
@@ -581,7 +601,7 @@ export default function AdminArea() {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={probabilityCounts} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} label={({ name, value }) => value ? `${name}: ${value}` : ""}>
+                <Pie data={probabilityCounts} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} label={({ payload, value }) => value ? `${payload.shortName}: ${value}` : ""}>
                   <Cell fill="#b91c1c" />
                   <Cell fill="#dc2626" />
                   <Cell fill="#ef4444" />

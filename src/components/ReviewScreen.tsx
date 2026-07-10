@@ -1,4 +1,4 @@
-Ôªø/**
+/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -9,47 +9,47 @@ import { FormResponse } from "../types";
 
 interface ReviewScreenProps {
   data: FormResponse;
-  onJumpToStep: (step: number) => void;
+  onJumpToQuestion: (questionNumber: number) => void;
   onSubmit: () => void;
   isSubmitting: boolean;
 }
 
 function formatListValue(value: string | string[]) {
-  if (Array.isArray(value)) return value.length ? value.join("\n") : "N√£o respondido";
-  return value || "N√£o respondido";
+  if (Array.isArray(value)) return value.length ? value.join("\n") : "N„o respondido";
+  return value || "N„o respondido";
 }
 
-export default function ReviewScreen({ data, onJumpToStep }: ReviewScreenProps) {
+export default function ReviewScreen({ data, onJumpToQuestion }: ReviewScreenProps) {
   const sections = [
     {
       title: "Atividade de maior valor",
       step: 2,
-      value: data.atividadeMaiorValor || "N√£o respondido"
+      value: data.atividadeMaiorValor || "N„o respondido"
     },
     {
       title: "Principal aprendizado",
       step: 2,
-      value: data.principalAprendizado || "N√£o respondido"
+      value: data.principalAprendizado || "N„o respondido"
     },
     {
-      title: "Probabilidade de aplica√ß√£o",
+      title: "Probabilidade de aplicaÁ„o",
       step: 2,
-      value: data.probabilidadeAplicacao ? `${data.probabilidadeAplicacao} / 5` : "N√£o respondido"
+      value: data.probabilidadeAplicacao ? `${data.probabilidadeAplicacao} / 5` : "N„o respondido"
     },
     {
-      title: "Pr√°tica que pretende aplicar",
+      title: "Pr·tica que pretende aplicar",
       step: 3,
-      value: data.praticaPretendeAplicar || "N√£o respondido"
+      value: data.praticaPretendeAplicar || "N„o respondido"
     },
     {
-      title: "Iniciativas priorit√°rias da REN",
+      title: "Iniciativas priorit·rias da REN",
       step: 3,
       value: formatListValue(data.iniciativaPrioritariaREN)
     },
     {
-      title: "Recomenda√ß√£o estrat√©gica",
+      title: "RecomendaÁ„o estratÈgica",
       step: 3,
-      value: data.recomendacaoEstrategicaREN || "N√£o respondido"
+      value: data.recomendacaoEstrategicaREN || "N„o respondido"
     }
   ];
 
@@ -57,7 +57,7 @@ export default function ReviewScreen({ data, onJumpToStep }: ReviewScreenProps) 
     <div className="space-y-6" id="review-screen">
       <div className="text-center max-w-2xl mx-auto">
         <h3 className="text-xl sm:text-2xl font-display font-black text-neutral-800">Resumo das respostas</h3>
-        <p className="text-sm text-neutral-500 mt-2">Revise as respostas antes de enviar. Voc√™ pode editar qualquer item clicando em editar.</p>
+        <p className="text-sm text-neutral-500 mt-2">Revise as respostas antes de enviar. VocÍ pode editar qualquer item clicando em editar.</p>
       </div>
 
       <div className="space-y-3">
@@ -65,7 +65,7 @@ export default function ReviewScreen({ data, onJumpToStep }: ReviewScreenProps) 
           <div key={section.title} className="rounded-xl border border-neutral-200 bg-white p-4">
             <div className="flex items-center justify-between gap-3">
               <h4 className="text-sm font-semibold text-neutral-800">{section.title}</h4>
-              <button type="button" onClick={() => onJumpToStep(section.step)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-red">
+              <button type="button" onClick={() => onJumpToQuestion(section.questionNumber)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-red">
                 <Edit3 className="h-3.5 w-3.5" />
                 Editar
               </button>
@@ -79,8 +79,8 @@ export default function ReviewScreen({ data, onJumpToStep }: ReviewScreenProps) 
         <div className="flex items-start gap-3">
           <FileText className="h-6 w-6 text-brand-dark shrink-0" />
           <div>
-            <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-brand-dark">Confirma√ß√£o</h5>
-            <p className="text-sm text-neutral-600">Ao confirmar o envio, suas respostas ser√£o registradas para a an√°lise estrat√©gica do F√≥rum.</p>
+            <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-brand-dark">ConfirmaÁ„o</h5>
+            <p className="text-sm text-neutral-600">Ao confirmar o envio, suas respostas ser„o registradas para a an·lise estratÈgica do FÛrum.</p>
           </div>
         </div>
       </div>
