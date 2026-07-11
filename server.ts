@@ -36,6 +36,8 @@ type CachedInsight = {
   status: "atualizado" | "desatualizado" | "processando" | "erro";
   updatedAt: string | null;
   modelo: string;
+  responsesFingerprint?: string;
+  latestResponseAt?: string | null;
 };
 
 type ReportPayload = {
@@ -55,6 +57,8 @@ type ReportPayload = {
 };
 
 type Submission = Record<string, any> & { id: string };
+
+const insightGenerationByQuestion = new Map<QuestionId, Promise<CachedInsight>>();
 
 const QUESTION_CONFIGS: Record<QuestionId, {
   pergunta: string;
@@ -249,7 +253,9 @@ async function readAnalysesCache(): Promise<Record<string, CachedInsight>> {
       quantidadeRespostasAnalisadas: Number(data.quantidadeRespostasAnalisadas) || 0,
       status: (data.status as CachedInsight["status"]) || "desatualizado",
       updatedAt: typeof data.updatedAt === "string" ? data.updatedAt : null,
-      modelo: normalizeString(data.modelo)
+      modelo: normalizeString(data.modelo),
+      responsesFingerprint: normalizeString(data.responsesFingerprint) || undefined,
+      latestResponseAt: typeof data.latestResponseAt === "string" ? data.latestResponseAt : null
     };
   });
 
@@ -306,7 +312,13 @@ function parseJsonResponse(raw: string) {
   return JSON.parse(jsonText);
 }
 
-function buildInsightFromParsed(questionId: QuestionId, parsed: any, quantidade: number): CachedInsight {
+function buildInsightFromParsed(
+  questionId: QuestionId,
+  parsed: any,
+  quantidade: number,
+  responsesFingerprint: string,
+  latestResponseAt: string | null
+): CachedInsight {
   const config = QUESTION_CONFIGS[questionId];
   const extract = (values: unknown): string[] => uniqueStrings(Array.isArray(values) ? values.map(normalizeString) : []);
   return {
@@ -319,7 +331,9 @@ function buildInsightFromParsed(questionId: QuestionId, parsed: any, quantidade:
     quantidadeRespostasAnalisadas: quantidade,
     status: "atualizado",
     updatedAt: new Date().toISOString(),
-    modelo: getAiProviderStatus().model || ""
+    modelo: getAiProviderStatus().model || "",
+    responsesFingerprint,
+    latestResponseAt
   };
 }
 
@@ -337,36 +351,77 @@ function buildPlaceholderInsight(questionId: QuestionId, quantidade: number): Ca
     modelo: getAiProviderStatus().model || ""
   };
 }
-function getRelevantResponses(questionId: QuestionId, submissions: Submission[]): string[] {
+function getRelevantResponseState(questionId: QuestionId, submissions: Submission[]) {
   const config = QUESTION_CONFIGS[questionId];
-  const responses = submissions
-    .map((item) => getStringCandidate(item, config.fieldCandidates))
-    .map((value) => truncate(value, 320))
-    .filter(Boolean);
-  return uniqueStrings(responses).slice(0, 60);
+  const entries = submissions
+    .map((submission) => ({
+      id: normalizeString(submission.id),
+      response: getStringCandidate(submission, config.fieldCandidates),
+      updatedAtMs: toMillis(submission.updatedAt || submission.createdAt || submission.updatedAtLocal || submission.createdAtLocal)
+    }))
+    .filter((entry) => entry.response)
+    .sort((a, b) => a.id.localeCompare(b.id));
+  const latestResponseAtMs = Math.max(0, ...entries.map((entry) => entry.updatedAtMs));
+
+  return {
+    count: entries.length,
+    fingerprint: crypto
+      .createHash("sha256")
+      .update(JSON.stringify(entries.map(({ id, response }) => [id, response])))
+      .digest("hex"),
+    latestResponseAt: latestResponseAtMs ? new Date(latestResponseAtMs).toISOString() : null,
+    promptResponses: uniqueStrings(entries.map((entry) => truncate(entry.response, 320))).slice(0, 60)
+  };
 }
 
-async function generateInsight(questionId: QuestionId, submissions: Submission[]): Promise<CachedInsight> {
-  const relevantResponses = getRelevantResponses(questionId, submissions);
-  const prompt = buildPromptForQuestion(questionId, relevantResponses);
+async function generateInsight(
+  questionId: QuestionId,
+  responseState: ReturnType<typeof getRelevantResponseState>
+): Promise<CachedInsight> {
+  const prompt = buildPromptForQuestion(questionId, responseState.promptResponses);
   const raw = await generateStructuredResponse(prompt);
   const parsed = parseJsonResponse(raw);
-  return buildInsightFromParsed(questionId, parsed, submissions.length);
+  return buildInsightFromParsed(
+    questionId,
+    parsed,
+    responseState.count,
+    responseState.fingerprint,
+    responseState.latestResponseAt
+  );
 }
 
 async function ensureInsight(questionId: QuestionId, submissions: Submission[], cache: Record<string, CachedInsight>): Promise<CachedInsight> {
   const existing = cache[questionId];
-  if (existing && existing.quantidadeRespostasAnalisadas === submissions.length && existing.status === "atualizado") {
+  const responseState = getRelevantResponseState(questionId, submissions);
+  if (
+    existing
+    && existing.responsesFingerprint === responseState.fingerprint
+    && existing.status === "atualizado"
+  ) {
     return existing;
   }
 
-  if (submissions.length < 3) {
-    return existing || buildPlaceholderInsight(questionId, submissions.length);
+  if (responseState.count < 3) {
+    return existing || buildPlaceholderInsight(questionId, responseState.count);
   }
 
-  const insight = await generateInsight(questionId, submissions);
-  await saveInsightCache(insight);
-  return insight;
+  const generationInProgress = insightGenerationByQuestion.get(questionId);
+  if (generationInProgress) return generationInProgress;
+
+  const generation = (async () => {
+    const insight = await generateInsight(questionId, responseState);
+    await saveInsightCache(insight);
+    return insight;
+  })();
+  insightGenerationByQuestion.set(questionId, generation);
+
+  try {
+    return await generation;
+  } finally {
+    if (insightGenerationByQuestion.get(questionId) === generation) {
+      insightGenerationByQuestion.delete(questionId);
+    }
+  }
 }
 
 function aggregateReport(submissions: Submission[], insights: CachedInsight[]): ReportPayload {
@@ -562,6 +617,7 @@ async function startServer() {
 }
 
 startServer().catch((err) => console.error("Falha ao iniciar servidor:", err));
+
 
 
 
