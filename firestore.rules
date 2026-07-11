@@ -1,89 +1,13 @@
-rules_version = '2';
+﻿rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function to check if the user is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    // Admin access is controlled by Google sign-in email.
-    function isGoogleSignIn() {
-      return isAuthenticated() &&
-        request.auth.token.firebase.sign_in_provider == "google.com";
-    }
-
-    function authEmailLower() {
-      return request.auth.token.email.lower();
-    }
-
-    function hasUidAdminProfile() {
-      return exists(/databases/$(database)/documents/admin_users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/admin_users/$(request.auth.uid)).data.ativo == true &&
-        get(/databases/$(database)/documents/admin_users/$(request.auth.uid)).data.email.lower() == authEmailLower();
-    }
-
-    function hasEmailAdminProfile() {
-      return exists(/databases/$(database)/documents/admin_users/$(authEmailLower())) &&
-        get(/databases/$(database)/documents/admin_users/$(authEmailLower())).data.ativo == true &&
-        get(/databases/$(database)/documents/admin_users/$(authEmailLower())).data.email.lower() == authEmailLower();
-    }
-
-    // Helper function to check if user has active admin profile
-    function isAdmin() {
-      return isGoogleSignIn() && (hasUidAdminProfile() || hasEmailAdminProfile());
-    }
-
-    function isUidAdminMaster() {
-      return hasUidAdminProfile() &&
-        get(/databases/$(database)/documents/admin_users/$(request.auth.uid)).data.perfil == "admin_master";
-    }
-
-    function isEmailAdminMaster() {
-      return hasEmailAdminProfile() &&
-        get(/databases/$(database)/documents/admin_users/$(request.auth.token.email)).data.perfil == "admin_master";
-    }
-
-    // Helper function to check if user is admin master
-    function isAdminMaster() {
-      return isGoogleSignIn() && (isUidAdminMaster() || isEmailAdminMaster());
-    }
-
-    function isValidAdminEmail(email) {
-      return email is string && email.matches(".*@.*[.].*");
-    }
-
-    function isValidAdminUserDocument(userId) {
-      return request.resource.data.keys().hasAll(["uid", "nome", "email", "perfil", "ativo", "createdAt"]) &&
-        request.resource.data.uid is string &&
-        request.resource.data.nome is string &&
-        isValidAdminEmail(request.resource.data.email) &&
-        (request.resource.data.email == userId || request.resource.data.uid == userId) &&
-        request.resource.data.perfil == "admin_master" &&
-        request.resource.data.ativo == true;
-    }
-
-    // Security rules for admin_users collection
-    match /admin_users/{userId} {
-      allow read: if isAdmin() || (isGoogleSignIn() && (request.auth.uid == userId || authEmailLower() == userId.lower()));
-      allow create: if (isAdminMaster() && isValidAdminUserDocument(userId)) ||
-                    (isGoogleSignIn() &&
-                    request.auth.uid == userId &&
-                    request.resource.data.uid == request.auth.uid &&
-                    request.resource.data.email.lower() in [
-                      "nomura.eduardo@gmail.com",
-                      "nomura.yudas@gmail.com"
-                    ] &&
-                    request.resource.data.ativo == true);
-      allow update, delete: if isAdminMaster();
-    }
-
-    // Security rules for forum_nikkei_respostas collection
     match /forum_nikkei_respostas/{responseId} {
-      // Anyone can create a response, but only admins can read or write
       allow create: if true;
-      allow read, update: if isAdmin();
-      allow delete: if isAdminMaster();
+      allow read, update, delete: if false;
+    }
+
+    match /forum_nikkei_analises/{documentId} {
+      allow read, write: if false;
     }
   }
 }

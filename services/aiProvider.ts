@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+﻿import { GoogleGenAI } from "@google/genai";
 
 const WRITING_INSTRUCTIONS = `Você é um assistente de redação.
 
@@ -18,11 +18,29 @@ Regras obrigatórias:
 - Não faça comentários sobre o processo de revisão.
 - Retorne somente o texto final aprimorado.`;
 
+const REPORT_INSTRUCTIONS = `Você é um analista responsável por consolidar os resultados do questionário do Fórum Empresarial Nikkei Brasil-Japão.
+
+Analise as respostas fornecidas para uma única pergunta aberta.
+
+Seu objetivo é identificar padrões recorrentes, aprendizados, necessidades, oportunidades e recomendações presentes nas respostas.
+
+Regras obrigatórias:
+1. Não identifique participantes.
+2. Não reproduza respostas individuais completas.
+3. Não invente informações.
+4. Não atribua uma opinião à totalidade dos participantes quando ela tiver sido mencionada por apenas uma pessoa.
+5. Diferencie temas recorrentes de contribuições pontuais.
+6. Use linguagem objetiva, profissional e institucional.
+7. Não faça elogios adicionais à REN Brasil, à Toyota ou ao evento.
+8. Não acrescente recomendações que não estejam sustentadas pelas respostas.
+9. Produza uma síntese adequada para um relatório executivo.
+10. Retorne exclusivamente JSON válido.`;
+
 function buildPrompt(question: string, answer: string) {
   return `${WRITING_INSTRUCTIONS}\n\nPergunta:\n${question}\n\nResposta:\n${answer}`;
 }
 
-async function improveWithOpenAI(question: string, answer: string): Promise<string> {
+async function requestOpenAI(input: string, instructions: string, maxTokens: number): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY não configurada");
 
@@ -34,9 +52,9 @@ async function improveWithOpenAI(question: string, answer: string): Promise<stri
     },
     body: JSON.stringify({
       model: process.env.OPENAI_MODEL || "gpt-5.4-mini",
-      instructions: WRITING_INSTRUCTIONS,
-      input: `Pergunta:\n${question}\n\nResposta:\n${answer}`,
-      max_output_tokens: 600
+      instructions,
+      input,
+      max_output_tokens: maxTokens
     }),
     signal: AbortSignal.timeout(30_000)
   });
@@ -50,63 +68,67 @@ async function improveWithOpenAI(question: string, answer: string): Promise<stri
   return text.trim();
 }
 
-async function improveWithGemini(question: string, answer: string): Promise<string> {
+async function requestGemini(input: string, instructions: string, maxTokens: number): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY não configurada");
 
   const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
     model: process.env.GEMINI_MODEL || "gemini-3.5-flash",
-    contents: buildPrompt(question, answer),
-    config: { maxOutputTokens: 600, temperature: 0.2 }
+    contents: `${instructions}\n\n${input}`,
+    config: { maxOutputTokens: maxTokens, temperature: 0.2 }
   });
   const text = response.text;
   if (!text?.trim()) throw new Error("Gemini não retornou texto");
   return text.trim();
 }
 
+function buildProviderStatus(provider: string, model: string, configured: boolean) {
+  return { provider, model, configured };
+}
+
 export function getAiProviderStatus() {
   const provider = (process.env.AI_PROVIDER || "gemini").toLowerCase();
   if (provider === "gemini_openai" || provider === "auto") {
-    return {
-      provider: "gemini_openai",
-      model: `${process.env.GEMINI_MODEL || "gemini-3.5-flash"} -> ${process.env.OPENAI_MODEL || "gpt-5.4-mini"}`,
-      configured: Boolean(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY)
-    };
+    return buildProviderStatus(
+      "gemini_openai",
+      `${process.env.GEMINI_MODEL || "gemini-3.5-flash"} -> ${process.env.OPENAI_MODEL || "gpt-5.4-mini"}`,
+      Boolean(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY)
+    );
   }
   if (provider === "openai") {
-    return {
-      provider,
-      model: process.env.OPENAI_MODEL || "gpt-5.4-mini",
-      configured: Boolean(process.env.OPENAI_API_KEY)
-    };
+    return buildProviderStatus(provider, process.env.OPENAI_MODEL || "gpt-5.4-mini", Boolean(process.env.OPENAI_API_KEY));
   }
   if (provider === "gemini") {
-    return {
-      provider,
-      model: process.env.GEMINI_MODEL || "gemini-3.5-flash",
-      configured: Boolean(process.env.GEMINI_API_KEY)
-    };
+    return buildProviderStatus(provider, process.env.GEMINI_MODEL || "gemini-3.5-flash", Boolean(process.env.GEMINI_API_KEY));
   }
-  return { provider, model: "", configured: false };
+  return buildProviderStatus(provider, "", false);
 }
 
-export async function improveAnswer(question: string, answer: string): Promise<string> {
+async function generateWithProvider(input: string, instructions: string, maxTokens: number): Promise<string> {
   const { provider } = getAiProviderStatus();
   if (provider === "gemini_openai") {
     if (process.env.GEMINI_API_KEY) {
       try {
-        return await improveWithGemini(question, answer);
+        return await requestGemini(input, instructions, maxTokens);
       } catch {
-        // O conteúdo e os detalhes do erro não são registrados nem enviados ao cliente.
+        // Keep trying the fallback.
       }
     }
     if (process.env.OPENAI_API_KEY) {
-      return improveWithOpenAI(question, answer);
+      return requestOpenAI(input, instructions, maxTokens);
     }
     throw new Error("Nenhum provedor de IA configurado");
   }
-  if (provider === "openai") return improveWithOpenAI(question, answer);
-  if (provider === "gemini") return improveWithGemini(question, answer);
+  if (provider === "openai") return requestOpenAI(input, instructions, maxTokens);
+  if (provider === "gemini") return requestGemini(input, instructions, maxTokens);
   throw new Error("AI_PROVIDER inválido");
+}
+
+export async function improveAnswer(question: string, answer: string): Promise<string> {
+  return generateWithProvider(`Pergunta:\n${question}\n\nResposta:\n${answer}`, WRITING_INSTRUCTIONS, 600);
+}
+
+export async function generateStructuredResponse(input: string): Promise<string> {
+  return generateWithProvider(input, REPORT_INSTRUCTIONS, 1200);
 }

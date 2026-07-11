@@ -1,10 +1,10 @@
-/**
+﻿/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import React, { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, Bot, Compass, Lightbulb, RotateCcw, Send, Shield, Sparkles, Star, UserRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, Compass, Lightbulb, RotateCcw, Send, Sparkles, Star, UserRound } from "lucide-react";
 import {
   DEFAULT_FORM_VALUES,
   FormResponse,
@@ -17,8 +17,7 @@ import WelcomeScreen from "./components/WelcomeScreen";
 import ReviewScreen from "./components/ReviewScreen";
 import SuccessScreen from "./components/SuccessScreen";
 import Logo from "./components/Logo";
-import AdminArea from "./components/AdminArea";
-import { db, doc, serverTimestamp, setDoc } from "./lib/firebase";
+import PublicReport from "./components/PublicReport";
 
 interface ChatQuestionProps {
   number: number;
@@ -154,12 +153,12 @@ export default function App() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasDraft, setHasDraft] = useState(false);
   const [draftData, setDraftData] = useState<FormResponse | null>(null);
-  const [isAdminMode, setIsAdminMode] = useState(false);
+  const [route, setRoute] = useState<"questionnaire" | "report">(() => window.location.hash === "#/relatorio" ? "report" : "questionnaire");
   const [activeQuestion, setActiveQuestion] = useState(1);
   const [isEditingFromReview, setIsEditingFromReview] = useState(false);
   const [aiAnswers, setAiAnswers] = useState<Record<OpenAnswerField, AiAnswerState>>(createEmptyAiAnswers);
 
-  const stepNames = ["Apresentação", "Parte 1", "Parte 2", "Resumo", "Sucesso"];
+  const stepNames = ["ApresentaÃ§Ã£o", "Parte 1", "Parte 2", "Resumo", "Sucesso"];
   const currentQuestionUsesChoice = [1, 3].includes(activeQuestion);
   const currentChoiceValue = currentQuestionUsesChoice ? (activeQuestion === 1 ? formData.atividadeMaiorValor : formData.probabilidadeAplicacao) : null;
   const mainAlignmentClass = step === 1 ? "justify-center" : "justify-start";
@@ -186,7 +185,11 @@ export default function App() {
 
   useEffect(() => {
     const handleHashChange = () => {
-      setIsAdminMode(window.location.hash.startsWith("#/admin"));
+      if (window.location.hash === "#/admin") {
+        window.location.hash = "#/relatorio";
+        return;
+      }
+      setRoute(window.location.hash === "#/relatorio" ? "report" : "questionnaire");
     };
     window.addEventListener("hashchange", handleHashChange);
     handleHashChange();
@@ -213,7 +216,7 @@ export default function App() {
       try {
         localStorage.setItem("forum_nikkei_draft", JSON.stringify(formData));
       } catch (e) {
-        console.warn("Não foi possível salvar o rascunho:", e);
+        console.warn("NÃ£o foi possÃ­vel salvar o rascunho:", e);
       }
     }
   }, [formData, step]);
@@ -228,7 +231,7 @@ export default function App() {
       try {
         localStorage.removeItem("forum_nikkei_draft");
       } catch (e) {
-        console.warn("Não foi possível limpar o rascunho:", e);
+        console.warn("NÃ£o foi possÃ­vel limpar o rascunho:", e);
       }
     }
     setActiveQuestion(nextQuestion);
@@ -236,6 +239,10 @@ export default function App() {
     setAiAnswers(createEmptyAiAnswers());
     setStep(nextQuestion <= 3 ? 2 : 3);
     setErrors({});
+  };
+
+  const handleViewResults = () => {
+    window.location.hash = "#/relatorio";
   };
 
   const handleFieldChange = (field: keyof FormResponse, value: any) => {
@@ -280,11 +287,11 @@ export default function App() {
       const data = await response.json();
       if (!response.ok) {
         const message = data?.code === "AI_NOT_CONFIGURED"
-          ? "O assistente de IA ainda não foi configurado. Contate o administrador."
-          : data?.message || "Não foi possível aprimorar sua resposta. Tente novamente em alguns instantes.";
+          ? "O assistente de IA ainda nÃ£o foi configurado. Contate o administrador."
+          : data?.message || "NÃ£o foi possÃ­vel aprimorar sua resposta. Tente novamente em alguns instantes.";
         throw new Error(message);
       }
-      if (typeof data.improvedAnswer !== "string" || !data.improvedAnswer.trim()) throw new Error("Resposta inválida");
+      if (typeof data.improvedAnswer !== "string" || !data.improvedAnswer.trim()) throw new Error("Resposta invÃ¡lida");
 
       const improvedAnswer = data.improvedAnswer.trim();
       setFormData((prev) => ({ ...prev, [field]: improvedAnswer }));
@@ -304,7 +311,7 @@ export default function App() {
         [field]: {
           ...prev[field],
           loading: false,
-          error: error instanceof Error ? error.message : "Não foi possível aprimorar sua resposta. Tente novamente em alguns instantes."
+          error: error instanceof Error ? error.message : "NÃ£o foi possÃ­vel aprimorar sua resposta. Tente novamente em alguns instantes."
         }
       }));
     }
@@ -330,7 +337,7 @@ export default function App() {
 
     if (questionNumber === 2) {
       if (!formData.principalAprendizado.trim()) {
-        currentErrors.principalAprendizado = "Este campo é obrigatório.";
+        currentErrors.principalAprendizado = "Este campo Ã© obrigatÃ³rio.";
       }
     }
 
@@ -342,19 +349,19 @@ export default function App() {
 
     if (questionNumber === 4) {
       if (!formData.praticaPretendeAplicar.trim()) {
-        currentErrors.praticaPretendeAplicar = "Este campo é obrigatório.";
+        currentErrors.praticaPretendeAplicar = "Este campo Ã© obrigatÃ³rio.";
       }
     }
 
     if (questionNumber === 5) {
       if (getInitiativeSelections(formData.iniciativaPrioritariaREN).length === 0) {
-        currentErrors.iniciativaPrioritariaREN = "Selecione de 1 a 3 iniciativas prioritárias.";
+        currentErrors.iniciativaPrioritariaREN = "Selecione de 1 a 3 iniciativas prioritÃ¡rias.";
       }
     }
 
     if (questionNumber === 6) {
       if (!formData.recomendacaoEstrategicaREN.trim()) {
-        currentErrors.recomendacaoEstrategicaREN = "Este campo é obrigatório.";
+        currentErrors.recomendacaoEstrategicaREN = "Este campo Ã© obrigatÃ³rio.";
       }
     }
 
@@ -480,6 +487,9 @@ export default function App() {
         pratica_pretende_aplicar_original: aiAnswers.praticaPretendeAplicar.improved ? aiAnswers.praticaPretendeAplicar.originalText : formData.praticaPretendeAplicar,
         pratica_pretende_aplicar_final: formData.praticaPretendeAplicar,
         pratica_pretende_aplicar_ia: aiAnswers.praticaPretendeAplicar.improved,
+        recomendacao_estrategica_ren_original: aiAnswers.recomendacaoEstrategicaREN.improved ? aiAnswers.recomendacaoEstrategicaREN.originalText : formData.recomendacaoEstrategicaREN,
+        recomendacao_estrategica_ren_final: formData.recomendacaoEstrategicaREN,
+        recomendacao_estrategica_ren_ia: aiAnswers.recomendacaoEstrategicaREN.improved,
         recomendacao_original: aiAnswers.recomendacaoEstrategicaREN.improved ? aiAnswers.recomendacaoEstrategicaREN.originalText : formData.recomendacaoEstrategicaREN,
         recomendacao_final: formData.recomendacaoEstrategicaREN,
         recomendacao_ia: aiAnswers.recomendacaoEstrategicaREN.improved,
@@ -488,25 +498,31 @@ export default function App() {
         eventoId: formData.eventoId || "forum_empresarial_nikkei_2026",
         createdAtLocal: timestamp,
         updatedAtLocal: timestamp,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        origem: "app_web_direto_firestore",
+        origem: "app_web_direto_api",
         evento: "forum_empresarial_nikkei_2026"
       };
 
-      await setDoc(doc(db, "forum_nikkei_respostas", responseId), payload);
+      const response = await fetch("/api/respostas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.message || "N?o foi poss?vel gravar sua resposta no servidor.");
+      }
 
       try {
         localStorage.removeItem("forum_nikkei_draft");
       } catch (e) {
-        console.warn("Não foi possível limpar o rascunho:", e);
+        console.warn("N?o foi poss?vel limpar o rascunho:", e);
       }
       setActiveQuestion(1);
       setIsEditingFromReview(false);
       setStep(5);
     } catch (e) {
-      console.error("Erro ao gravar no Firebase:", e);
-      alert("Não foi possível gravar sua resposta no Firebase. Tente novamente.");
+      console.error("Erro ao gravar resposta:", e);
+      alert("N?o foi poss?vel gravar sua resposta no servidor. Tente novamente.");
     } finally {
       setIsSubmitting(false);
     }
@@ -522,30 +538,8 @@ export default function App() {
     setAiAnswers(createEmptyAiAnswers());
   };
 
-  if (isAdminMode) {
-    return (
-      <div className="min-h-screen bg-neutral-50 text-neutral-800 flex flex-col font-sans">
-        <header className="bg-white border-b border-neutral-200/80 py-3 px-6 sticky top-0 z-40 shadow-xs">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Logo variant="horizontal" className="h-10" />
-              <div className="h-8 w-[1px] bg-neutral-200 hidden md:block" />
-              <div className="hidden md:flex flex-col">
-                <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-brand-red leading-tight">
-                  Fórum Empresarial Nikkei Brasil-Japão
-                </span>
-                <h1 className="text-xs font-display font-bold text-neutral-500 tracking-tight">
-                  Painel Administrativo 2026
-                </h1>
-              </div>
-            </div>
-          </div>
-        </header>
-        <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
-          <AdminArea />
-        </main>
-      </div>
-    );
+  if (route === "report") {
+    return <PublicReport onBackToQuestionnaire={() => { window.location.hash = "#/"; }} />;
   }
 
   return (
@@ -557,31 +551,31 @@ export default function App() {
             <div className="h-8 w-[1px] bg-neutral-200 hidden md:block" />
             <div className="hidden md:flex flex-col">
               <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-brand-red leading-tight">
-                Fórum Empresarial Nikkei Brasil-Japão
+                FÃ³rum Empresarial Nikkei Brasil-JapÃ£o
               </span>
               <h1 className="text-xs font-display font-bold text-neutral-500 tracking-tight">
-                Captura de aprendizados e recomendações
+                Captura de aprendizados e recomendaÃ§Ãµes
               </h1>
             </div>
           </div>
           <div className="hidden sm:flex items-center gap-2 bg-neutral-50 border border-neutral-200/60 rounded-full px-3 py-1.5 text-[10px] text-neutral-500 font-mono font-bold uppercase tracking-wider">
             <span className="w-2 h-2 rounded-full bg-brand-red animate-pulse" />
-            Questionário 2026
+            QuestionÃ¡rio 2026
           </div>
         </div>
       </header>
 
       <main key={step} className={`flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col ${mainAlignmentClass}`}>
-        {step === 1 && <WelcomeScreen onStart={handleStart} hasDraft={hasDraft} draftData={draftData} />}
+        {step === 1 && <WelcomeScreen onStart={handleStart} onViewResults={handleViewResults} hasDraft={hasDraft} draftData={draftData} />}
 
         {step > 1 && step < 5 && (
           <div className="w-full max-w-5xl mx-auto bg-white border border-neutral-200/80 rounded-2xl shadow-2xl overflow-hidden">
             <div className="border-b border-neutral-100 bg-neutral-50/70 px-6 py-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-brand-red">Fórum Empresarial Nikkei Brasil-Japão</p>
+                  <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-brand-red">FÃ³rum Empresarial Nikkei Brasil-JapÃ£o</p>
                   <h2 className="text-lg font-display font-black text-neutral-800">
-                    {step === 2 ? "Parte 1 - Aprendizados e aplicação" : step === 3 ? "Parte 2 - Recomendações estratégicas" : "Resumo das respostas"}
+                    {step === 2 ? "Parte 1 - Aprendizados e aplicaÃ§Ã£o" : step === 3 ? "Parte 2 - RecomendaÃ§Ãµes estratÃ©gicas" : "Resumo das respostas"}
                   </h2>
                 </div>
                 <div className="text-right text-xs text-neutral-500">
@@ -601,8 +595,8 @@ export default function App() {
                     <ChatQuestion
                       number={1}
                       icon={<Sparkles className="h-3.5 w-3.5" />}
-                        question="Qual atividade do Fórum gerou maior valor para você?"
-                        helper="Escolha a opção que melhor representa sua percepção."
+                        question="Qual atividade do FÃ³rum gerou maior valor para vocÃª?"
+                        helper="Escolha a opÃ§Ã£o que melhor representa sua percepÃ§Ã£o."
                       error={errors.atividadeMaiorValor}
                     >
                       <div className="grid gap-3">
@@ -625,7 +619,7 @@ export default function App() {
                     <ChatQuestion
                       number={2}
                       icon={<Lightbulb className="h-3.5 w-3.5" />}
-                      question="Qual foi o principal aprendizado que você leva deste Fórum e por que ele foi significativo para você?"
+                      question="Qual foi o principal aprendizado que vocÃª leva deste FÃ³rum e por que ele foi significativo para vocÃª?"
                       helper="Registre sua resposta em formato livre, como se estivesse conversando com a REN Brasil."
                       error={errors.principalAprendizado}
                     >
@@ -634,7 +628,7 @@ export default function App() {
                         onChange={(value) => handleFieldChange("principalAprendizado", value)}
                         placeholder="Digite aqui seu principal aprendizado e por que ele foi importante."
                         aiState={aiAnswers.principalAprendizado}
-                        onImprove={() => handleImproveAnswer("principalAprendizado", "Qual foi o principal aprendizado que você leva deste Fórum e por que ele foi significativo para você?")}
+                        onImprove={() => handleImproveAnswer("principalAprendizado", "Qual foi o principal aprendizado que vocÃª leva deste FÃ³rum e por que ele foi significativo para vocÃª?")}
                         onRestore={() => handleRestoreAnswer("principalAprendizado")}
                       />
                     </ChatQuestion>
@@ -644,7 +638,7 @@ export default function App() {
                     <ChatQuestion
                       number={3}
                       icon={<Star className="h-3.5 w-3.5" />}
-                      question="Após participar do Fórum, qual é a probabilidade de aplicar algum aprendizado em sua empresa ou organização?"
+                      question="ApÃ³s participar do FÃ³rum, qual Ã© a probabilidade de aplicar algum aprendizado em sua empresa ou organizaÃ§Ã£o?"
                       helper="Selecione uma nota de 1 a 5."
                       error={errors.probabilidadeAplicacao}
                     >
@@ -676,16 +670,16 @@ export default function App() {
                     <ChatQuestion
                       number={4}
                       icon={<Compass className="h-3.5 w-3.5" />}
-                      question="Qual prática apresentada pela Toyota ou discutida durante o Fórum você pretende aplicar em sua empresa ou organização?"
-                      helper="Escreva a prática, conceito ou comportamento que pretende levar para sua rotina."
+                      question="Qual prÃ¡tica apresentada pela Toyota ou discutida durante o FÃ³rum vocÃª pretende aplicar em sua empresa ou organizaÃ§Ã£o?"
+                      helper="Escreva a prÃ¡tica, conceito ou comportamento que pretende levar para sua rotina."
                       error={errors.praticaPretendeAplicar}
                     >
                       <AssistedTextarea
                         value={formData.praticaPretendeAplicar}
                         onChange={(value) => handleFieldChange("praticaPretendeAplicar", value)}
-                        placeholder="Digite aqui a prática ou conceito que você pretende aplicar."
+                        placeholder="Digite aqui a prÃ¡tica ou conceito que vocÃª pretende aplicar."
                         aiState={aiAnswers.praticaPretendeAplicar}
-                        onImprove={() => handleImproveAnswer("praticaPretendeAplicar", "Qual prática apresentada pela Toyota ou discutida durante o Fórum você pretende aplicar em sua empresa ou organização?")}
+                        onImprove={() => handleImproveAnswer("praticaPretendeAplicar", "Qual prÃ¡tica apresentada pela Toyota ou discutida durante o FÃ³rum vocÃª pretende aplicar em sua empresa ou organizaÃ§Ã£o?")}
                         onRestore={() => handleRestoreAnswer("praticaPretendeAplicar")}
                       />
                     </ChatQuestion>
@@ -696,8 +690,8 @@ export default function App() {
                     <ChatQuestion
                       number={5}
                       icon={<Sparkles className="h-3.5 w-3.5" />}
-                      question="Quais iniciativas da REN Brasil podem gerar mais valor para você ou sua organização nos próximos dois anos?"
-                      helper="Selecione até 3 iniciativas com maior potencial na sua visão."
+                      question="Quais iniciativas da REN Brasil podem gerar mais valor para vocÃª ou sua organizaÃ§Ã£o nos prÃ³ximos dois anos?"
+                      helper="Selecione atÃ© 3 iniciativas com maior potencial na sua visÃ£o."
                       error={errors.iniciativaPrioritariaREN}
                     >
                       <div className="mb-3 text-xs font-semibold text-neutral-500">
@@ -730,16 +724,16 @@ export default function App() {
                     <ChatQuestion
                       number={6}
                       icon={<Lightbulb className="h-3.5 w-3.5" />}
-                      question="Considerando os aprendizados do Fórum, qual iniciativa a REN Brasil deveria liderar para fortalecer as relações empresariais entre Brasil, Japão e América Latina?"
-                      helper="Explique sua proposta com o nível de detalhe que achar necessário."
+                      question="Considerando os aprendizados do FÃ³rum, qual iniciativa a REN Brasil deveria liderar para fortalecer as relaÃ§Ãµes empresariais entre Brasil, JapÃ£o e AmÃ©rica Latina?"
+                      helper="Explique sua proposta com o nÃ­vel de detalhe que achar necessÃ¡rio."
                       error={errors.recomendacaoEstrategicaREN}
                     >
                       <AssistedTextarea
                         value={formData.recomendacaoEstrategicaREN}
                         onChange={(value) => handleFieldChange("recomendacaoEstrategicaREN", value)}
-                        placeholder="Digite aqui sua proposta de iniciativa estratégica para a REN Brasil."
+                        placeholder="Digite aqui sua proposta de iniciativa estratÃ©gica para a REN Brasil."
                         aiState={aiAnswers.recomendacaoEstrategicaREN}
-                        onImprove={() => handleImproveAnswer("recomendacaoEstrategicaREN", "Considerando os aprendizados do Fórum, qual iniciativa a REN Brasil deveria liderar para fortalecer as relações empresariais entre Brasil, Japão e América Latina?")}
+                        onImprove={() => handleImproveAnswer("recomendacaoEstrategicaREN", "Considerando os aprendizados do FÃ³rum, qual iniciativa a REN Brasil deveria liderar para fortalecer as relaÃ§Ãµes empresariais entre Brasil, JapÃ£o e AmÃ©rica Latina?")}
                         onRestore={() => handleRestoreAnswer("recomendacaoEstrategicaREN")}
                       />
                     </ChatQuestion>
@@ -770,7 +764,7 @@ export default function App() {
                       disabled={!currentChoiceValue}
                       className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition ${currentChoiceValue ? "bg-brand-red text-white hover:bg-brand-red-hover" : "bg-neutral-100 text-neutral-500"}`}
                     >
-                      {currentChoiceValue ? (isEditingFromReview ? "Confirmar" : (isEditingFromReview || activeQuestion === 6 ? "Revisar respostas" : "Continuar")) : "Selecione uma opção para continuar"}
+                      {currentChoiceValue ? (isEditingFromReview ? "Confirmar" : (isEditingFromReview || activeQuestion === 6 ? "Revisar respostas" : "Continuar")) : "Selecione uma opÃ§Ã£o para continuar"}
                       {!currentChoiceValue && null}
                     </button>
                   ) : (
@@ -799,19 +793,18 @@ export default function App() {
           </div>
         )}
 
-        {step === 5 && <SuccessScreen data={formData} onReset={handleReset} />}
+        {step === 5 && <SuccessScreen data={formData} onReset={handleReset} onViewResults={handleViewResults} />}
       </main>
 
       <footer className="border-t border-neutral-200/80 bg-white px-4 py-4">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 text-xs text-neutral-500 sm:flex-row">
-          <span>Fórum Empresarial Nikkei Brasil-Japão</span>
-          <a href="#/admin" className="inline-flex items-center gap-2 rounded-full border border-neutral-200 px-3 py-2 font-semibold text-neutral-600 hover:border-brand-red/40 hover:text-brand-red">
-            <Shield className="h-3.5 w-3.5" />
-            Acesso administrativo
-          </a>
+          <span>F?rum Empresarial Nikkei Brasil-Jap?o</span>
         </div>
       </footer>
     </div>
   );
 }
+
+
+
 

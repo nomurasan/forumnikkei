@@ -1,65 +1,45 @@
-/**
+﻿/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import { initializeApp } from "firebase/app";
-import { 
-  getFirestore, 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  writeBatch,
-  query, 
-  where,
+import {
   addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  getFirestore,
   orderBy,
-  serverTimestamp
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  where,
+  writeBatch
 } from "firebase/firestore";
-import { 
-  getAuth, 
-  signInWithEmailAndPassword, 
-  signOut, 
-  onAuthStateChanged,
-  User as FirebaseUser,
-  GoogleAuthProvider,
-  signInWithPopup,
-  signInWithRedirect
-} from "firebase/auth";
 
 import firebaseConfig from "../../firebase-applet-config.json";
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId || "(default)");
-const auth = getAuth(app);
 
-export { 
-  app, 
-  db, 
-  auth, 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  writeBatch,
-  query, 
-  where,
+export {
+  app,
+  db,
   addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
   orderBy,
+  query,
   serverTimestamp,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-  GoogleAuthProvider,
-  signInWithPopup,
-  signInWithRedirect
+  setDoc,
+  updateDoc,
+  where,
+  writeBatch
 };
-export type { FirebaseUser };

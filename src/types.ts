@@ -14,6 +14,42 @@ export interface FormResponse {
   recomendacaoEstrategicaREN: string;
 }
 
+export interface QuestionInsights {
+  questionId: string;
+  pergunta: string;
+  resumo: string;
+  principaisTemas: string[];
+  aplicacoesPraticas: string[];
+  oportunidades: string[];
+  quantidadeRespostasAnalisadas: number;
+  updatedAt: string | null;
+}
+
+export interface PublicReport {
+  indicadores: {
+    totalRespostas: number;
+    atividadeMaisValorizada: string;
+    mediaProbabilidadeAplicacao: number;
+    iniciativaMaisVotada: string;
+  };
+  graficos: {
+    atividades: Array<{
+      nome: string;
+      total: number;
+    }>;
+    probabilidadeAplicacao: Array<{
+      nota: number;
+      total: number;
+    }>;
+    iniciativas: Array<{
+      nome: string;
+      total: number;
+    }>;
+  };
+  insights: QuestionInsights[];
+  updatedAt: string | null;
+}
+
 export const ATIVIDADES_OPTIONS = [
   "Palestra Magna",
   "Visita à fábrica Toyota",
