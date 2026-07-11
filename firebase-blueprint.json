@@ -1,18 +1,7 @@
 {
   "collections": {
-    "admin_users": {
-      "description": "Lista de usu√°rios autorizados a acessar o painel administrativo",
-      "schema": {
-        "uid": { "type": "string" },
-        "nome": { "type": "string" },
-        "email": { "type": "string" },
-        "perfil": { "type": "string" },
-        "ativo": { "type": "boolean" },
-        "createdAt": { "type": "timestamp" }
-      }
-    },
     "forum_nikkei_respostas": {
-      "description": "Respostas coletadas do formul√°rio do F√≥rum Empresarial Nikkei",
+      "description": "Respostas coletadas do formul·rio do FÛrum Empresarial Nikkei",
       "schema": {
         "id": { "type": "string" },
         "nome": { "type": "string" },
