@@ -10,7 +10,7 @@ import fs from "fs";
 import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
 import { initializeApp, applicationDefault, cert, getApps, getApp } from "firebase-admin/app";
-import { getFirestore, serverTimestamp, doc as fsDoc, setDoc as fsSetDoc, getDocs, collection } from "firebase-admin/firestore";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { getAiProviderStatus, improveAnswer, generateStructuredResponse } from "./services/aiProvider";
 
 dotenv.config({ path: ".env.local", quiet: true, override: false });
@@ -18,9 +18,6 @@ dotenv.config({ quiet: true, override: false });
 
 const app = express();
 const PORT = 3000;
-const DATA_DIR = path.join(process.cwd(), "data");
-const SUBMISSIONS_FILE = path.join(DATA_DIR, "respostas.json");
-const ANALYSES_FILE = path.join(DATA_DIR, "report-cache.json");
 const FIREBASE_CONFIG_FILE = path.join(process.cwd(), "firebase-applet-config.json");
 const AI_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const AI_RATE_LIMIT_MAX_REQUESTS = 10;
@@ -97,18 +94,6 @@ function getFirestoreDatabaseId(): string {
   }
 }
 
-function ensureDataFiles() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(SUBMISSIONS_FILE)) {
-    fs.writeFileSync(SUBMISSIONS_FILE, JSON.stringify([], null, 2), "utf8");
-  }
-  if (!fs.existsSync(ANALYSES_FILE)) {
-    fs.writeFileSync(ANALYSES_FILE, JSON.stringify({}, null, 2), "utf8");
-  }
-}
-
 function tryInitAdminDb() {
   const rawServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "";
   const databaseId = process.env.FIREBASE_FIRESTORE_DATABASE_ID || getFirestoreDatabaseId();
@@ -135,25 +120,22 @@ function tryInitAdminDb() {
       console.log(`Firebase Admin SDK inicializado com credenciais padrão. databaseId=${databaseId}`);
       return;
     }
-
-    console.log("Firebase Admin SDK não configurado; usando cache local como fallback.");
+    console.error("Firebase Admin SDK não configurado. Defina FIREBASE_SERVICE_ACCOUNT_JSON e FIREBASE_FIRESTORE_DATABASE_ID para persistir no Firestore.");
   } catch (error) {
     adminDb = null;
     console.error("Erro ao inicializar Firebase Admin SDK:", error);
   }
 }
 
-function readJsonFile<T>(filePath: string, fallback: T): T {
-  try {
-    const text = fs.readFileSync(filePath, "utf8");
-    return JSON.parse(text || JSON.stringify(fallback));
-  } catch {
-    return fallback;
+function requireAdminDb() {
+  if (!adminDb) {
+    throw new Error("Firebase Admin SDK não configurado. Defina FIREBASE_SERVICE_ACCOUNT_JSON e FIREBASE_FIRESTORE_DATABASE_ID.");
   }
+  return adminDb;
 }
 
-function writeJsonFile(filePath: string, value: unknown) {
-  fs.writeFileSync(filePath, JSON.stringify(value, null, 2), "utf8");
+function isFirestoreConfigError(error: unknown) {
+  return error instanceof Error && error.message.includes("Firebase Admin SDK não configurado");
 }
 
 function normalizeString(value: unknown): string {
@@ -229,81 +211,54 @@ function normalizeSubmission(data: Record<string, any>, timestamps?: { createdAt
 }
 
 async function readSubmissions(): Promise<Submission[]> {
-  if (adminDb) {
-    try {
-      const snapshot = await getDocs(collection(adminDb, "forum_nikkei_respostas"));
-      return snapshot.docs.map((docSnap) => normalizeSubmission({ id: docSnap.id, ...docSnap.data() }));
-    } catch (error) {
-      console.error("Erro ao ler respostas do Firestore:", error);
-    }
-  }
-
-  return readJsonFile<Submission[]>(SUBMISSIONS_FILE, []).map((item) => normalizeSubmission(item));
+  const db = requireAdminDb();
+  const snapshot = await db.collection("forum_nikkei_respostas").get();
+  return snapshot.docs.map((docSnap: any) => normalizeSubmission({ id: docSnap.id, ...docSnap.data() }));
 }
 
 async function saveSubmission(submission: Submission) {
+  const db = requireAdminDb();
   const normalized = normalizeSubmission(submission, { createdAt: submission.createdAtLocal, updatedAt: submission.updatedAtLocal });
-  const submissions = await readSubmissions();
-  const next = [...submissions.filter((item) => item.id !== normalized.id), normalized];
-  writeJsonFile(SUBMISSIONS_FILE, next);
 
-  if (adminDb) {
-    await fsSetDoc(fsDoc(adminDb, "forum_nikkei_respostas", normalized.id), {
-      ...normalized,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    }, { merge: true });
-  }
+  await db.collection("forum_nikkei_respostas").doc(normalized.id).set({
+    ...normalized,
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp()
+  }, { merge: true });
 
   return normalized;
 }
 
-function readLocalAnalyses(): Record<string, CachedInsight> {
-  return readJsonFile<Record<string, CachedInsight>>(ANALYSES_FILE, {});
-}
 
-function writeLocalAnalyses(cache: Record<string, CachedInsight>) {
-  writeJsonFile(ANALYSES_FILE, cache);
-}
 
 async function readAnalysesCache(): Promise<Record<string, CachedInsight>> {
-  if (adminDb) {
-    try {
-      const snapshot = await getDocs(collection(adminDb, "forum_nikkei_analises"));
-      const cache: Record<string, CachedInsight> = {};
-      snapshot.docs.forEach((docSnap) => {
-        const data = docSnap.data() as Partial<CachedInsight>;
-        const questionId = String(data.questionId || docSnap.id) as QuestionId;
-        cache[questionId] = {
-          questionId,
-          pergunta: normalizeString(data.pergunta),
-          resumo: normalizeString(data.resumo),
-          principaisTemas: uniqueStrings(Array.isArray(data.principaisTemas) ? data.principaisTemas.map(normalizeString) : []),
-          aplicacoesPraticas: uniqueStrings(Array.isArray(data.aplicacoesPraticas) ? data.aplicacoesPraticas.map(normalizeString) : []),
-          oportunidades: uniqueStrings(Array.isArray(data.oportunidades) ? data.oportunidades.map(normalizeString) : []),
-          quantidadeRespostasAnalisadas: Number(data.quantidadeRespostasAnalisadas) || 0,
-          status: (data.status as CachedInsight["status"]) || "desatualizado",
-          updatedAt: typeof data.updatedAt === "string" ? data.updatedAt : null,
-          modelo: normalizeString(data.modelo)
-        };
-      });
-      return cache;
-    } catch (error) {
-      console.error("Erro ao ler análises do Firestore:", error);
-    }
-  }
+  const db = requireAdminDb();
+  const snapshot = await db.collection("forum_nikkei_analises").get();
+  const cache: Record<string, CachedInsight> = {};
 
-  return readLocalAnalyses();
+  snapshot.docs.forEach((docSnap: any) => {
+    const data = docSnap.data() as Partial<CachedInsight>;
+    const questionId = String(data.questionId || docSnap.id) as QuestionId;
+    cache[questionId] = {
+      questionId,
+      pergunta: normalizeString(data.pergunta),
+      resumo: normalizeString(data.resumo),
+      principaisTemas: uniqueStrings(Array.isArray(data.principaisTemas) ? data.principaisTemas.map(normalizeString) : []),
+      aplicacoesPraticas: uniqueStrings(Array.isArray(data.aplicacoesPraticas) ? data.aplicacoesPraticas.map(normalizeString) : []),
+      oportunidades: uniqueStrings(Array.isArray(data.oportunidades) ? data.oportunidades.map(normalizeString) : []),
+      quantidadeRespostasAnalisadas: Number(data.quantidadeRespostasAnalisadas) || 0,
+      status: (data.status as CachedInsight["status"]) || "desatualizado",
+      updatedAt: typeof data.updatedAt === "string" ? data.updatedAt : null,
+      modelo: normalizeString(data.modelo)
+    };
+  });
+
+  return cache;
 }
 
 async function saveInsightCache(insight: CachedInsight) {
-  const cache = await readAnalysesCache();
-  cache[insight.questionId] = insight;
-  writeLocalAnalyses(cache);
-
-  if (adminDb) {
-    await fsSetDoc(fsDoc(adminDb, "forum_nikkei_analises", insight.questionId), insight, { merge: true });
-  }
+  const db = requireAdminDb();
+  await db.collection("forum_nikkei_analises").doc(insight.questionId).set(insight, { merge: true });
 }
 
 function toMillis(value: any): number {
@@ -325,9 +280,7 @@ function truncate(text: string, limit = 260): string {
 
 function buildPromptForQuestion(questionId: QuestionId, responses: string[]) {
   const config = QUESTION_CONFIGS[questionId];
-  return `${REPORT_INSTRUCTIONS}
-
-Pergunta analisada:
+  return `Pergunta analisada:
 ${config.pergunta}
 
 Quantidade de respostas:
@@ -477,7 +430,6 @@ function aggregateReport(submissions: Submission[], insights: CachedInsight[]): 
 
 app.set("trust proxy", 1);
 app.use(express.json({ limit: "20kb" }));
-ensureDataFiles();
 tryInitAdminDb();
 
 app.post("/api/ai/improve", async (req, res) => {
@@ -538,7 +490,12 @@ app.post("/api/respostas", async (req, res) => {
     return res.json({ success: true, message: "Resposta enviada com sucesso!", id: submission.id });
   } catch (error) {
     console.error("Erro ao gravar resposta:", error);
-    return res.status(500).json({ success: false, message: "Não foi possível gravar a resposta no servidor. Tente novamente." });
+    return res.status(isFirestoreConfigError(error) ? 503 : 500).json({
+      success: false,
+      message: isFirestoreConfigError(error)
+        ? "O Firestore ainda não foi configurado no servidor."
+        : "Não foi possível gravar a resposta no servidor. Tente novamente."
+    });
   }
 });
 
@@ -561,7 +518,11 @@ app.get("/api/report", async (_req, res) => {
     return res.json(aggregateReport(submissions, insights));
   } catch (error) {
     console.error("Erro ao montar relatório público:", error);
-    return res.status(500).json({ message: "Não foi possível carregar os resultados neste momento." });
+    return res.status(isFirestoreConfigError(error) ? 503 : 500).json({
+      message: isFirestoreConfigError(error)
+        ? "O Firestore ainda não foi configurado no servidor."
+        : "Não foi possível carregar os resultados neste momento."
+    });
   }
 });
 
@@ -577,7 +538,11 @@ app.post("/api/report/insights/generate", async (req, res) => {
     return res.json(insight);
   } catch (error) {
     console.error("Erro ao gerar insight:", error);
-    return res.status(500).json({ message: "Não foi possível gerar o insight solicitado." });
+    return res.status(isFirestoreConfigError(error) ? 503 : 500).json({
+      message: isFirestoreConfigError(error)
+        ? "O Firestore ainda não foi configurado no servidor."
+        : "Não foi possível gerar o insight solicitado."
+    });
   }
 });
 

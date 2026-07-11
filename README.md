@@ -23,3 +23,6 @@ View your app in AI Studio: https://ai.studio/apps/3254a6d8-da92-4dff-94d0-f1ac4
    `npm run dev`
 
 In Easypanel, configure the same variables in the application environment. The browser calls only `POST /api/ai/improve`; provider keys are read exclusively by the Node/Express server.
+
+## Firestore persistence
+This app now saves submissions and report caches directly to Firestore. Configure `FIREBASE_SERVICE_ACCOUNT_JSON` and `FIREBASE_FIRESTORE_DATABASE_ID` in the server environment before running the app.
