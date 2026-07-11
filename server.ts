@@ -87,6 +87,37 @@ const QUESTION_CONFIGS: Record<QuestionId, {
 };
 
 let adminDb: any = null;
+let adminDbInitError: "missing_credentials" | "invalid_credentials" | "initialization_failed" | null = "missing_credentials";
+
+function parseServiceAccountJson(rawValue: string): Record<string, any> {
+  let normalized = rawValue.trim();
+  if (normalized.startsWith("'") && normalized.endsWith("'")) {
+    normalized = normalized.slice(1, -1).trim();
+  }
+
+  let parsed = JSON.parse(normalized);
+  if (typeof parsed === "string") {
+    parsed = JSON.parse(parsed);
+  }
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("Service account deve ser um objeto JSON.");
+  }
+
+  const serviceAccount = parsed as Record<string, any>;
+  if (
+    serviceAccount.type !== "service_account"
+    || !normalizeString(serviceAccount.project_id)
+    || !normalizeString(serviceAccount.client_email)
+    || !normalizeString(serviceAccount.private_key)
+  ) {
+    throw new Error("Service account incompleta.");
+  }
+
+  return {
+    ...serviceAccount,
+    private_key: String(serviceAccount.private_key).replace(/\\n/g, "\n")
+  };
+}
 
 function getFirestoreDatabaseId(): string {
   try {
@@ -99,11 +130,18 @@ function getFirestoreDatabaseId(): string {
 }
 
 function tryInitAdminDb() {
-  const rawServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "";
+  const rawJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "";
+  const rawBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 || "";
+  const rawServiceAccount = rawJson.trim()
+    ? rawJson
+    : rawBase64.trim()
+      ? Buffer.from(rawBase64.trim(), "base64").toString("utf8")
+      : "";
   const databaseId = process.env.FIREBASE_FIRESTORE_DATABASE_ID || getFirestoreDatabaseId();
+
   try {
     if (rawServiceAccount.trim()) {
-      const serviceAccount = JSON.parse(rawServiceAccount);
+      const serviceAccount = parseServiceAccountJson(rawServiceAccount);
       const projectId = serviceAccount.project_id || process.env.FIREBASE_PROJECT_ID;
       const appInstance = getApps().length
         ? getApp()
@@ -112,6 +150,7 @@ function tryInitAdminDb() {
             projectId
           });
       adminDb = databaseId === "(default)" ? getFirestore(appInstance) : getFirestore(appInstance, databaseId);
+      adminDbInitError = null;
       console.log(`Firebase Admin SDK inicializado com service account. databaseId=${databaseId}`);
       return;
     }
@@ -121,13 +160,19 @@ function tryInitAdminDb() {
         ? getApp()
         : initializeApp({ credential: applicationDefault() });
       adminDb = databaseId === "(default)" ? getFirestore(appInstance) : getFirestore(appInstance, databaseId);
+      adminDbInitError = null;
       console.log(`Firebase Admin SDK inicializado com credenciais padrão. databaseId=${databaseId}`);
       return;
     }
-    console.error("Firebase Admin SDK não configurado. Defina FIREBASE_SERVICE_ACCOUNT_JSON e FIREBASE_FIRESTORE_DATABASE_ID para persistir no Firestore.");
+
+    adminDbInitError = "missing_credentials";
+    console.error("[Firebase] Credencial administrativa ausente.");
   } catch (error) {
     adminDb = null;
-    console.error("Erro ao inicializar Firebase Admin SDK:", error);
+    adminDbInitError = error instanceof SyntaxError || /service account|private key/i.test(error instanceof Error ? error.message : "")
+      ? "invalid_credentials"
+      : "initialization_failed";
+    console.error(`[Firebase] Falha de inicialização. code=${adminDbInitError}`, error);
   }
 }
 
@@ -140,6 +185,16 @@ function requireAdminDb() {
 
 function isFirestoreConfigError(error: unknown) {
   return error instanceof Error && error.message.includes("Firebase Admin SDK não configurado");
+}
+
+function getFirestoreConfigMessage() {
+  if (adminDbInitError === "invalid_credentials") {
+    return "A credencial administrativa do Firestore é inválida. Verifique FIREBASE_SERVICE_ACCOUNT_JSON no servidor.";
+  }
+  if (adminDbInitError === "initialization_failed") {
+    return "Não foi possível inicializar o Firestore no servidor. Consulte os logs da implantação.";
+  }
+  return "A credencial administrativa do Firestore não foi recebida pelo servidor.";
 }
 
 function normalizeString(value: unknown): string {
@@ -548,7 +603,7 @@ app.post("/api/respostas", async (req, res) => {
     return res.status(isFirestoreConfigError(error) ? 503 : 500).json({
       success: false,
       message: isFirestoreConfigError(error)
-        ? "O Firestore ainda não foi configurado no servidor."
+        ? getFirestoreConfigMessage()
         : "Não foi possível gravar a resposta no servidor. Tente novamente."
     });
   }
@@ -575,7 +630,7 @@ app.get("/api/report", async (_req, res) => {
     console.error("Erro ao montar relatório público:", error);
     return res.status(isFirestoreConfigError(error) ? 503 : 500).json({
       message: isFirestoreConfigError(error)
-        ? "O Firestore ainda não foi configurado no servidor."
+        ? getFirestoreConfigMessage()
         : "Não foi possível carregar os resultados neste momento."
     });
   }
@@ -595,7 +650,7 @@ app.post("/api/report/insights/generate", async (req, res) => {
     console.error("Erro ao gerar insight:", error);
     return res.status(isFirestoreConfigError(error) ? 503 : 500).json({
       message: isFirestoreConfigError(error)
-        ? "O Firestore ainda não foi configurado no servidor."
+        ? getFirestoreConfigMessage()
         : "Não foi possível gerar o insight solicitado."
     });
   }
@@ -617,6 +672,9 @@ async function startServer() {
 }
 
 startServer().catch((err) => console.error("Falha ao iniciar servidor:", err));
+
+
+
 
 
 
