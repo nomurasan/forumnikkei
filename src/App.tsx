@@ -179,8 +179,7 @@ export default function App() {
       .map((item) => item === "Outro" && data.iniciativaPrioritariaRENOutro?.trim()
         ? "Outro: " + data.iniciativaPrioritariaRENOutro.trim()
         : item)
-      .join("
-");
+      .join("\n");
   };
 
   const getFirstUnansweredQuestion = (data: FormResponse) => {
@@ -872,6 +871,7 @@ export default function App() {
     </div>
   );
 }
+
 
 
 

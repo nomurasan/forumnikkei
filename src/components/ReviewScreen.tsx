@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -19,37 +19,53 @@ function formatListValue(value: string | string[]) {
   return value || "Não respondido";
 }
 
+function formatActivity(data: FormResponse) {
+  if (data.atividadeMaiorValor === "Outro" && data.atividadeMaiorValorOutro?.trim()) {
+    return "Outro: " + data.atividadeMaiorValorOutro.trim();
+  }
+  return data.atividadeMaiorValor || "Não respondido";
+}
+
+function formatInitiatives(data: FormResponse) {
+  const values = data.iniciativaPrioritariaREN.map((item) =>
+    item === "Outro" && data.iniciativaPrioritariaRENOutro?.trim()
+      ? "Outro: " + data.iniciativaPrioritariaRENOutro.trim()
+      : item
+  );
+  return formatListValue(values);
+}
+
 export default function ReviewScreen({ data, onJumpToQuestion }: ReviewScreenProps) {
   const sections = [
     {
       title: "Atividade de maior valor",
       questionNumber: 1,
-      value: data.atividadeMaiorValor || "Não respondido"
+      value: formatActivity(data)
     },
     {
       title: "Principal aprendizado",
       questionNumber: 2,
-      value: data.principalAprendizado || "Não respondido"
+      value: data.principalAprendizado || "NÃ£o respondido"
     },
     {
-      title: "Probabilidade de aplicação",
+      title: "Probabilidade de aplicaÃ§Ã£o",
       questionNumber: 3,
-      value: data.probabilidadeAplicacao ? `${data.probabilidadeAplicacao} / 5` : "Não respondido"
+      value: data.probabilidadeAplicacao ? `${data.probabilidadeAplicacao} / 5` : "NÃ£o respondido"
     },
     {
-      title: "Prática que pretende aplicar",
+      title: "PrÃ¡tica que pretende aplicar",
       questionNumber: 4,
-      value: data.praticaPretendeAplicar || "Não respondido"
+      value: data.praticaPretendeAplicar || "NÃ£o respondido"
     },
     {
-      title: "Iniciativas prioritárias da REN",
+      title: "Iniciativas prioritÃ¡rias da REN",
       questionNumber: 5,
-      value: formatListValue(data.iniciativaPrioritariaREN)
+      value: formatInitiatives(data)
     },
     {
-      title: "Recomendação estratégica",
+      title: "RecomendaÃ§Ã£o estratÃ©gica",
       questionNumber: 6,
-      value: data.recomendacaoEstrategicaREN || "Não respondido"
+      value: data.recomendacaoEstrategicaREN || "NÃ£o respondido"
     }
   ];
 
@@ -57,7 +73,7 @@ export default function ReviewScreen({ data, onJumpToQuestion }: ReviewScreenPro
     <div className="space-y-6" id="review-screen">
       <div className="text-center max-w-2xl mx-auto">
         <h3 className="text-xl sm:text-2xl font-display font-black text-neutral-800">Resumo das respostas</h3>
-        <p className="text-sm text-neutral-500 mt-2">Revise as respostas antes de enviar. Você pode editar qualquer item clicando em editar.</p>
+        <p className="text-sm text-neutral-500 mt-2">Revise as respostas antes de enviar. VocÃª pode editar qualquer item clicando em editar.</p>
       </div>
 
       <div className="space-y-3">
@@ -79,11 +95,13 @@ export default function ReviewScreen({ data, onJumpToQuestion }: ReviewScreenPro
         <div className="flex items-start gap-3">
           <FileText className="h-6 w-6 text-brand-dark shrink-0" />
           <div>
-            <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-brand-dark">Confirmação</h5>
-            <p className="text-sm text-neutral-600">Ao confirmar o envio, suas respostas serão registradas para a análise estratégica do Fórum.</p>
+            <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-brand-dark">ConfirmaÃ§Ã£o</h5>
+            <p className="text-sm text-neutral-600">Ao confirmar o envio, suas respostas serÃ£o registradas para a anÃ¡lise estratÃ©gica do FÃ³rum.</p>
           </div>
         </div>
       </div>
     </div>
   );
 }
+
+

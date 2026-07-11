@@ -243,6 +243,7 @@ function normalizeSubmission(data: Record<string, any>, timestamps?: { createdAt
     participanteId: normalizeString(data.participanteId),
     eventoId: normalizeString(data.eventoId) || "forum_empresarial_nikkei_2026",
     atividadeMaiorValor: normalizeString(data.atividadeMaiorValor),
+    atividadeMaiorValorOutro: normalizeString(data.atividadeMaiorValorOutro).slice(0, 200),
     principalAprendizado,
     principal_aprendizado_original: normalizeString(data.principal_aprendizado_original) || principalAprendizado,
     principal_aprendizado_final: normalizeString(data.principal_aprendizado_final) || principalAprendizado,
@@ -253,6 +254,7 @@ function normalizeSubmission(data: Record<string, any>, timestamps?: { createdAt
     pratica_pretende_aplicar_final: normalizeString(data.pratica_pretende_aplicar_final) || praticaPretendeAplicar,
     pratica_pretende_aplicar_ia: Boolean(data.pratica_pretende_aplicar_ia),
     iniciativaPrioritariaREN: initiatives,
+    iniciativaPrioritariaRENOutro: normalizeString(data.iniciativaPrioritariaRENOutro).slice(0, 200),
     recomendacaoEstrategicaREN: recomendacao,
     recomendacao_estrategica_ren_original: normalizeString(data.recomendacao_estrategica_ren_original) || recomendacao,
     recomendacao_estrategica_ren_final: normalizeString(data.recomendacao_estrategica_ren_final) || recomendacao,
@@ -587,10 +589,19 @@ app.post("/api/ai/improve", async (req, res) => {
 
 app.post("/api/respostas", async (req, res) => {
   const data = req.body || {};
+  const activity = normalizeString(data.atividadeMaiorValor);
+  const activityOther = normalizeString(data.atividadeMaiorValorOutro);
   const selectedInitiatives = normalizeArray(data.iniciativaPrioritariaREN);
+  const initiativeOther = normalizeString(data.iniciativaPrioritariaRENOutro);
 
-  if (!normalizeString(data.atividadeMaiorValor) || !normalizeString(data.principalAprendizado) || !Number(data.probabilidadeAplicacao) || !normalizeString(data.praticaPretendeAplicar) || selectedInitiatives.length === 0 || !normalizeString(data.recomendacaoEstrategicaREN)) {
+  if (!activity || !normalizeString(data.principalAprendizado) || !Number(data.probabilidadeAplicacao) || !normalizeString(data.praticaPretendeAplicar) || selectedInitiatives.length === 0 || !normalizeString(data.recomendacaoEstrategicaREN)) {
     return res.status(400).json({ success: false, message: "Por favor, responda todas as seis perguntas antes de enviar." });
+  }
+  if (activity === "Outro" && !activityOther) {
+    return res.status(400).json({ success: false, message: "Informe qual foi a outra atividade." });
+  }
+  if (selectedInitiatives.includes("Outro") && !initiativeOther) {
+    return res.status(400).json({ success: false, message: "Informe qual é a outra iniciativa prioritária." });
   }
 
   try {
@@ -672,6 +683,7 @@ async function startServer() {
 }
 
 startServer().catch((err) => console.error("Falha ao iniciar servidor:", err));
+
 
 
 
