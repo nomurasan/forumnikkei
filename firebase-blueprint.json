@@ -1,7 +1,7 @@
-{
+Ôªø{
   "collections": {
     "forum_nikkei_respostas": {
-      "description": "Respostas coletadas do formul·rio do FÛrum Empresarial Nikkei",
+      "description": "Respostas coletadas do formul√°rio do F√≥rum Empresarial Nikkei",
       "schema": {
         "id": { "type": "string" },
         "nome": { "type": "string" },
@@ -12,6 +12,9 @@
         "pais": { "type": "string" },
         "avaliacaoGeral": { "type": "number" },
         "atividadeMaiorValor": { "type": "string" },
+        "atividadeMaiorValorOutro": { "type": "string", "description": "Complemento quando atividadeMaiorValor for Outro" },
+        "iniciativaPrioritariaREN": { "type": "array", "items": { "type": "string" } },
+        "iniciativaPrioritariaRENOutro": { "type": "string", "description": "Complemento quando iniciativaPrioritariaREN incluir Outro" },
         "destaqueForum": { "type": "string" },
         "tresAprendizados": { "type": "string" },
         "ideiaMaisImpactante": { "type": "string" },
@@ -46,3 +49,4 @@
     }
   }
 }
+
