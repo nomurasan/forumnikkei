@@ -628,8 +628,8 @@ export default function App() {
                     <ChatQuestion
                       number={1}
                       icon={<Sparkles className="h-3.5 w-3.5" />}
-                        question="Qual atividade do Fórum gerou maior valor para você?"
-                        helper="Escolha a opção que melhor representa sua percepção."
+                      question="Qual atividade do Fórum gerou maior valor para você?"
+                      helper="Escolha a opção que melhor representa sua percepção."
                       error={errors.atividadeMaiorValor || errors.atividadeMaiorValorOutro}
                     >
                       <div className="grid gap-3">
