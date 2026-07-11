@@ -358,7 +358,9 @@ export default function PublicReport({ onBackToQuestionnaire }: PublicReportProp
 
           <div className="mt-6 grid gap-5 lg:grid-cols-3">
             {report.insights.map((insight) => (
-              <InsightCard key={insight.questionId} insight={insight} />
+              <React.Fragment key={insight.questionId}>
+                <InsightCard insight={insight} />
+              </React.Fragment>
             ))}
           </div>
         </section>
