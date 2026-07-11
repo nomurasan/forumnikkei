@@ -9,21 +9,37 @@ import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
-import { initializeApp, applicationDefault, cert, getApps, getApp } from "firebase-admin/app";
+import {
+  initializeApp,
+  applicationDefault,
+  cert,
+  getApps,
+  getApp,
+} from "firebase-admin/app";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
-import { getAiProviderStatus, improveAnswer, generateStructuredResponse } from "./services/aiProvider";
+import {
+  getAiProviderStatus,
+  improveAnswer,
+  generateStructuredResponse,
+} from "./services/aiProvider";
 
 dotenv.config({ path: ".env.local", quiet: true, override: false });
 dotenv.config({ quiet: true, override: false });
 
 const app = express();
 const PORT = 3000;
-const FIREBASE_CONFIG_FILE = path.join(process.cwd(), "firebase-applet-config.json");
+const FIREBASE_CONFIG_FILE = path.join(
+  process.cwd(),
+  "firebase-applet-config.json",
+);
 const AI_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const AI_RATE_LIMIT_MAX_REQUESTS = 10;
 const aiRequestsByIp = new Map<string, number[]>();
 
-type QuestionId = "principal_aprendizado" | "pratica_pretende_aplicar" | "recomendacao_estrategica_ren";
+type QuestionId =
+  | "principal_aprendizado"
+  | "pratica_pretende_aplicar"
+  | "recomendacao_estrategica_ren";
 
 type CachedInsight = {
   questionId: QuestionId;
@@ -58,36 +74,62 @@ type ReportPayload = {
 
 type Submission = Record<string, any> & { id: string };
 
-const insightGenerationByQuestion = new Map<QuestionId, Promise<CachedInsight>>();
+const insightGenerationByQuestion = new Map<
+  QuestionId,
+  Promise<CachedInsight>
+>();
 
-const QUESTION_CONFIGS: Record<QuestionId, {
-  pergunta: string;
-  fieldCandidates: string[];
-  promptLabel: string;
-  responseKey: "principaisTemas" | "aplicacoesPraticas" | "oportunidades";
-}> = {
+const QUESTION_CONFIGS: Record<
+  QuestionId,
+  {
+    pergunta: string;
+    fieldCandidates: string[];
+    promptLabel: string;
+    responseKey: "principaisTemas" | "aplicacoesPraticas" | "oportunidades";
+  }
+> = {
   principal_aprendizado: {
-    pergunta: "Qual foi o principal aprendizado que você leva deste Fórum e como ele pode contribuir para o desenvolvimento da sua empresa ou organização?",
-    fieldCandidates: ["principal_aprendizado_final", "principalAprendizado", "principal_aprendizado_original"],
+    pergunta:
+      "Qual foi o principal aprendizado que você leva deste Fórum e como ele pode contribuir para o desenvolvimento da sua empresa ou organização?",
+    fieldCandidates: [
+      "principal_aprendizado_final",
+      "principalAprendizado",
+      "principal_aprendizado_original",
+    ],
     promptLabel: "principal aprendizado",
-    responseKey: "principaisTemas"
+    responseKey: "principaisTemas",
   },
   pratica_pretende_aplicar: {
-    pergunta: "Caso pretenda aplicar algum aprendizado, qual prática ou iniciativa você pretende implementar em sua empresa ou organização?",
-    fieldCandidates: ["pratica_pretende_aplicar_final", "praticaPretendeAplicar", "pratica_pretende_aplicar_original"],
+    pergunta:
+      "Caso pretenda aplicar algum aprendizado, qual prática ou iniciativa você pretende implementar em sua empresa ou organização?",
+    fieldCandidates: [
+      "pratica_pretende_aplicar_final",
+      "praticaPretendeAplicar",
+      "pratica_pretende_aplicar_original",
+    ],
     promptLabel: "prática a aplicar",
-    responseKey: "aplicacoesPraticas"
+    responseKey: "aplicacoesPraticas",
   },
   recomendacao_estrategica_ren: {
-    pergunta: "Que tema ou iniciativa você gostaria de ver na programação da REN Brasil para apoiar o fortalecimento das empresas nikkeis?",
-    fieldCandidates: ["recomendacao_estrategica_ren_final", "recomendacaoEstrategicaREN", "recomendacao_final", "recomendacao_estrategica_ren_original"],
+    pergunta:
+      "Que tema ou iniciativa você gostaria de ver na programação da REN Brasil para apoiar o fortalecimento das empresas nikkeis?",
+    fieldCandidates: [
+      "recomendacao_estrategica_ren_final",
+      "recomendacaoEstrategicaREN",
+      "recomendacao_final",
+      "recomendacao_estrategica_ren_original",
+    ],
     promptLabel: "recomendações para a REN Brasil",
-    responseKey: "oportunidades"
-  }
+    responseKey: "oportunidades",
+  },
 };
 
 let adminDb: any = null;
-let adminDbInitError: "missing_credentials" | "invalid_credentials" | "initialization_failed" | null = "missing_credentials";
+let adminDbInitError:
+  | "missing_credentials"
+  | "invalid_credentials"
+  | "initialization_failed"
+  | null = "missing_credentials";
 
 function parseServiceAccountJson(rawValue: string): Record<string, any> {
   let normalized = rawValue.trim();
@@ -105,17 +147,17 @@ function parseServiceAccountJson(rawValue: string): Record<string, any> {
 
   const serviceAccount = parsed as Record<string, any>;
   if (
-    serviceAccount.type !== "service_account"
-    || !normalizeString(serviceAccount.project_id)
-    || !normalizeString(serviceAccount.client_email)
-    || !normalizeString(serviceAccount.private_key)
+    serviceAccount.type !== "service_account" ||
+    !normalizeString(serviceAccount.project_id) ||
+    !normalizeString(serviceAccount.client_email) ||
+    !normalizeString(serviceAccount.private_key)
   ) {
     throw new Error("Service account incompleta.");
   }
 
   return {
     ...serviceAccount,
-    private_key: String(serviceAccount.private_key).replace(/\\n/g, "\n")
+    private_key: String(serviceAccount.private_key).replace(/\\n/g, "\n"),
   };
 }
 
@@ -137,21 +179,28 @@ function tryInitAdminDb() {
     : rawBase64.trim()
       ? Buffer.from(rawBase64.trim(), "base64").toString("utf8")
       : "";
-  const databaseId = process.env.FIREBASE_FIRESTORE_DATABASE_ID || getFirestoreDatabaseId();
+  const databaseId =
+    process.env.FIREBASE_FIRESTORE_DATABASE_ID || getFirestoreDatabaseId();
 
   try {
     if (rawServiceAccount.trim()) {
       const serviceAccount = parseServiceAccountJson(rawServiceAccount);
-      const projectId = serviceAccount.project_id || process.env.FIREBASE_PROJECT_ID;
+      const projectId =
+        serviceAccount.project_id || process.env.FIREBASE_PROJECT_ID;
       const appInstance = getApps().length
         ? getApp()
         : initializeApp({
             credential: cert(serviceAccount),
-            projectId
+            projectId,
           });
-      adminDb = databaseId === "(default)" ? getFirestore(appInstance) : getFirestore(appInstance, databaseId);
+      adminDb =
+        databaseId === "(default)"
+          ? getFirestore(appInstance)
+          : getFirestore(appInstance, databaseId);
       adminDbInitError = null;
-      console.log(`Firebase Admin SDK inicializado com service account. databaseId=${databaseId}`);
+      console.log(
+        `Firebase Admin SDK inicializado com service account. databaseId=${databaseId}`,
+      );
       return;
     }
 
@@ -159,9 +208,14 @@ function tryInitAdminDb() {
       const appInstance = getApps().length
         ? getApp()
         : initializeApp({ credential: applicationDefault() });
-      adminDb = databaseId === "(default)" ? getFirestore(appInstance) : getFirestore(appInstance, databaseId);
+      adminDb =
+        databaseId === "(default)"
+          ? getFirestore(appInstance)
+          : getFirestore(appInstance, databaseId);
       adminDbInitError = null;
-      console.log(`Firebase Admin SDK inicializado com credenciais padrão. databaseId=${databaseId}`);
+      console.log(
+        `Firebase Admin SDK inicializado com credenciais padrão. databaseId=${databaseId}`,
+      );
       return;
     }
 
@@ -169,22 +223,34 @@ function tryInitAdminDb() {
     console.error("[Firebase] Credencial administrativa ausente.");
   } catch (error) {
     adminDb = null;
-    adminDbInitError = error instanceof SyntaxError || /service account|private key/i.test(error instanceof Error ? error.message : "")
-      ? "invalid_credentials"
-      : "initialization_failed";
-    console.error(`[Firebase] Falha de inicialização. code=${adminDbInitError}`, error);
+    adminDbInitError =
+      error instanceof SyntaxError ||
+      /service account|private key/i.test(
+        error instanceof Error ? error.message : "",
+      )
+        ? "invalid_credentials"
+        : "initialization_failed";
+    console.error(
+      `[Firebase] Falha de inicialização. code=${adminDbInitError}`,
+      error,
+    );
   }
 }
 
 function requireAdminDb() {
   if (!adminDb) {
-    throw new Error("Firebase Admin SDK não configurado. Defina FIREBASE_SERVICE_ACCOUNT_JSON e FIREBASE_FIRESTORE_DATABASE_ID.");
+    throw new Error(
+      "Firebase Admin SDK não configurado. Defina FIREBASE_SERVICE_ACCOUNT_JSON e FIREBASE_FIRESTORE_DATABASE_ID.",
+    );
   }
   return adminDb;
 }
 
 function isFirestoreConfigError(error: unknown) {
-  return error instanceof Error && error.message.includes("Firebase Admin SDK não configurado");
+  return (
+    error instanceof Error &&
+    error.message.includes("Firebase Admin SDK não configurado")
+  );
 }
 
 function getFirestoreConfigMessage() {
@@ -219,7 +285,10 @@ function getStringCandidate(data: Record<string, any>, keys: string[]): string {
   return "";
 }
 
-function getArrayCandidate(data: Record<string, any>, keys: string[]): string[] {
+function getArrayCandidate(
+  data: Record<string, any>,
+  keys: string[],
+): string[] {
   for (const key of keys) {
     const value = data[key];
     if (Array.isArray(value)) return uniqueStrings(value.map(normalizeString));
@@ -229,12 +298,28 @@ function getArrayCandidate(data: Record<string, any>, keys: string[]): string[] 
   return [];
 }
 
-function normalizeSubmission(data: Record<string, any>, timestamps?: { createdAt?: string; updatedAt?: string }): Submission {
+function normalizeSubmission(
+  data: Record<string, any>,
+  timestamps?: { createdAt?: string; updatedAt?: string },
+): Submission {
   const createdAt = timestamps?.createdAt || new Date().toISOString();
   const updatedAt = timestamps?.updatedAt || createdAt;
-  const principalAprendizado = getStringCandidate(data, ["principal_aprendizado_final", "principalAprendizado", "principal_aprendizado_original"]);
-  const praticaPretendeAplicar = getStringCandidate(data, ["pratica_pretende_aplicar_final", "praticaPretendeAplicar", "pratica_pretende_aplicar_original"]);
-  const recomendacao = getStringCandidate(data, ["recomendacao_estrategica_ren_final", "recomendacaoEstrategicaREN", "recomendacao_final", "recomendacao_estrategica_ren_original"]);
+  const principalAprendizado = getStringCandidate(data, [
+    "principal_aprendizado_final",
+    "principalAprendizado",
+    "principal_aprendizado_original",
+  ]);
+  const praticaPretendeAplicar = getStringCandidate(data, [
+    "pratica_pretende_aplicar_final",
+    "praticaPretendeAplicar",
+    "pratica_pretende_aplicar_original",
+  ]);
+  const recomendacao = getStringCandidate(data, [
+    "recomendacao_estrategica_ren_final",
+    "recomendacaoEstrategicaREN",
+    "recomendacao_final",
+    "recomendacao_estrategica_ren_original",
+  ]);
   const initiatives = getArrayCandidate(data, ["iniciativaPrioritariaREN"]);
 
   return {
@@ -243,54 +328,81 @@ function normalizeSubmission(data: Record<string, any>, timestamps?: { createdAt
     participanteId: normalizeString(data.participanteId),
     eventoId: normalizeString(data.eventoId) || "forum_empresarial_nikkei_2026",
     atividadeMaiorValor: normalizeString(data.atividadeMaiorValor),
-    atividadeMaiorValorOutro: normalizeString(data.atividadeMaiorValorOutro).slice(0, 200),
+    atividadeMaiorValorOutro: normalizeString(
+      data.atividadeMaiorValorOutro,
+    ).slice(0, 200),
     principalAprendizado,
-    principal_aprendizado_original: normalizeString(data.principal_aprendizado_original) || principalAprendizado,
-    principal_aprendizado_final: normalizeString(data.principal_aprendizado_final) || principalAprendizado,
+    principal_aprendizado_original:
+      normalizeString(data.principal_aprendizado_original) ||
+      principalAprendizado,
+    principal_aprendizado_final:
+      normalizeString(data.principal_aprendizado_final) || principalAprendizado,
     principal_aprendizado_ia: Boolean(data.principal_aprendizado_ia),
     probabilidadeAplicacao: Number(data.probabilidadeAplicacao) || 0,
     praticaPretendeAplicar,
-    pratica_pretende_aplicar_original: normalizeString(data.pratica_pretende_aplicar_original) || praticaPretendeAplicar,
-    pratica_pretende_aplicar_final: normalizeString(data.pratica_pretende_aplicar_final) || praticaPretendeAplicar,
+    pratica_pretende_aplicar_original:
+      normalizeString(data.pratica_pretende_aplicar_original) ||
+      praticaPretendeAplicar,
+    pratica_pretende_aplicar_final:
+      normalizeString(data.pratica_pretende_aplicar_final) ||
+      praticaPretendeAplicar,
     pratica_pretende_aplicar_ia: Boolean(data.pratica_pretende_aplicar_ia),
     iniciativaPrioritariaREN: initiatives,
-    iniciativaPrioritariaRENOutro: normalizeString(data.iniciativaPrioritariaRENOutro).slice(0, 200),
+    iniciativaPrioritariaRENOutro: normalizeString(
+      data.iniciativaPrioritariaRENOutro,
+    ).slice(0, 200),
     recomendacaoEstrategicaREN: recomendacao,
-    recomendacao_estrategica_ren_original: normalizeString(data.recomendacao_estrategica_ren_original) || recomendacao,
-    recomendacao_estrategica_ren_final: normalizeString(data.recomendacao_estrategica_ren_final) || recomendacao,
-    recomendacao_estrategica_ren_ia: Boolean(data.recomendacao_estrategica_ren_ia),
-    recomendacao_original: normalizeString(data.recomendacao_original) || recomendacao,
-    recomendacao_final: normalizeString(data.recomendacao_final) || recomendacao,
+    recomendacao_estrategica_ren_original:
+      normalizeString(data.recomendacao_estrategica_ren_original) ||
+      recomendacao,
+    recomendacao_estrategica_ren_final:
+      normalizeString(data.recomendacao_estrategica_ren_final) || recomendacao,
+    recomendacao_estrategica_ren_ia: Boolean(
+      data.recomendacao_estrategica_ren_ia,
+    ),
+    recomendacao_original:
+      normalizeString(data.recomendacao_original) || recomendacao,
+    recomendacao_final:
+      normalizeString(data.recomendacao_final) || recomendacao,
     recomendacao_ia: Boolean(data.recomendacao_ia),
     createdAtLocal: createdAt,
     updatedAtLocal: updatedAt,
     createdAt: data.createdAt || createdAt,
     updatedAt: data.updatedAt || updatedAt,
     origem: normalizeString(data.origem) || "app_web_direto_api",
-    evento: normalizeString(data.evento) || "forum_empresarial_nikkei_2026"
+    evento: normalizeString(data.evento) || "forum_empresarial_nikkei_2026",
   };
 }
 
 async function readSubmissions(): Promise<Submission[]> {
   const db = requireAdminDb();
   const snapshot = await db.collection("forum_nikkei_respostas").get();
-  return snapshot.docs.map((docSnap: any) => normalizeSubmission({ id: docSnap.id, ...docSnap.data() }));
+  return snapshot.docs.map((docSnap: any) =>
+    normalizeSubmission({ id: docSnap.id, ...docSnap.data() }),
+  );
 }
 
 async function saveSubmission(submission: Submission) {
   const db = requireAdminDb();
-  const normalized = normalizeSubmission(submission, { createdAt: submission.createdAtLocal, updatedAt: submission.updatedAtLocal });
+  const normalized = normalizeSubmission(submission, {
+    createdAt: submission.createdAtLocal,
+    updatedAt: submission.updatedAtLocal,
+  });
 
-  await db.collection("forum_nikkei_respostas").doc(normalized.id).set({
-    ...normalized,
-    createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp()
-  }, { merge: true });
+  await db
+    .collection("forum_nikkei_respostas")
+    .doc(normalized.id)
+    .set(
+      {
+        ...normalized,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
 
   return normalized;
 }
-
-
 
 async function readAnalysesCache(): Promise<Record<string, CachedInsight>> {
   const db = requireAdminDb();
@@ -304,15 +416,32 @@ async function readAnalysesCache(): Promise<Record<string, CachedInsight>> {
       questionId,
       pergunta: normalizeString(data.pergunta),
       resumo: normalizeString(data.resumo),
-      principaisTemas: uniqueStrings(Array.isArray(data.principaisTemas) ? data.principaisTemas.map(normalizeString) : []),
-      aplicacoesPraticas: uniqueStrings(Array.isArray(data.aplicacoesPraticas) ? data.aplicacoesPraticas.map(normalizeString) : []),
-      oportunidades: uniqueStrings(Array.isArray(data.oportunidades) ? data.oportunidades.map(normalizeString) : []),
-      quantidadeRespostasAnalisadas: Number(data.quantidadeRespostasAnalisadas) || 0,
+      principaisTemas: uniqueStrings(
+        Array.isArray(data.principaisTemas)
+          ? data.principaisTemas.map(normalizeString)
+          : [],
+      ),
+      aplicacoesPraticas: uniqueStrings(
+        Array.isArray(data.aplicacoesPraticas)
+          ? data.aplicacoesPraticas.map(normalizeString)
+          : [],
+      ),
+      oportunidades: uniqueStrings(
+        Array.isArray(data.oportunidades)
+          ? data.oportunidades.map(normalizeString)
+          : [],
+      ),
+      quantidadeRespostasAnalisadas:
+        Number(data.quantidadeRespostasAnalisadas) || 0,
       status: (data.status as CachedInsight["status"]) || "desatualizado",
       updatedAt: typeof data.updatedAt === "string" ? data.updatedAt : null,
       modelo: normalizeString(data.modelo),
-      responsesFingerprint: normalizeString(data.responsesFingerprint) || undefined,
-      latestResponseAt: typeof data.latestResponseAt === "string" ? data.latestResponseAt : null
+      responsesFingerprint:
+        normalizeString(data.responsesFingerprint) || undefined,
+      latestResponseAt:
+        typeof data.latestResponseAt === "string"
+          ? data.latestResponseAt
+          : null,
     };
   });
 
@@ -321,7 +450,10 @@ async function readAnalysesCache(): Promise<Record<string, CachedInsight>> {
 
 async function saveInsightCache(insight: CachedInsight) {
   const db = requireAdminDb();
-  await db.collection("forum_nikkei_analises").doc(insight.questionId).set(insight, { merge: true });
+  await db
+    .collection("forum_nikkei_analises")
+    .doc(insight.questionId)
+    .set(insight, { merge: true });
 }
 
 function toMillis(value: any): number {
@@ -338,7 +470,9 @@ function formatListValue(value: unknown): string[] {
 
 function truncate(text: string, limit = 260): string {
   const compact = normalizeString(text).replace(/\s+/g, " ");
-  return compact.length > limit ? `${compact.slice(0, limit - 1).trimEnd()}…` : compact;
+  return compact.length > limit
+    ? `${compact.slice(0, limit - 1).trimEnd()}…`
+    : compact;
 }
 
 function buildPromptForQuestion(questionId: QuestionId, responses: string[]) {
@@ -365,7 +499,10 @@ function parseJsonResponse(raw: string) {
   const text = normalizeString(raw);
   const firstBrace = text.indexOf("{");
   const lastBrace = text.lastIndexOf("}");
-  const jsonText = firstBrace >= 0 && lastBrace > firstBrace ? text.slice(firstBrace, lastBrace + 1) : text;
+  const jsonText =
+    firstBrace >= 0 && lastBrace > firstBrace
+      ? text.slice(firstBrace, lastBrace + 1)
+      : text;
   return JSON.parse(jsonText);
 }
 
@@ -374,10 +511,11 @@ function buildInsightFromParsed(
   parsed: any,
   quantidade: number,
   responsesFingerprint: string,
-  latestResponseAt: string | null
+  latestResponseAt: string | null,
 ): CachedInsight {
   const config = QUESTION_CONFIGS[questionId];
-  const extract = (values: unknown): string[] => uniqueStrings(Array.isArray(values) ? values.map(normalizeString) : []);
+  const extract = (values: unknown): string[] =>
+    uniqueStrings(Array.isArray(values) ? values.map(normalizeString) : []);
   return {
     questionId,
     pergunta: config.pergunta,
@@ -390,50 +528,76 @@ function buildInsightFromParsed(
     updatedAt: new Date().toISOString(),
     modelo: getAiProviderStatus().model || "",
     responsesFingerprint,
-    latestResponseAt
+    latestResponseAt,
   };
 }
 
-function buildPlaceholderInsight(questionId: QuestionId, quantidade: number): CachedInsight {
+function buildPlaceholderInsight(
+  questionId: QuestionId,
+  quantidade: number,
+): CachedInsight {
   return {
     questionId,
     pergunta: QUESTION_CONFIGS[questionId].pergunta,
-    resumo: "Ainda não há respostas suficientes para gerar uma análise consolidada.",
+    resumo:
+      "Ainda não há respostas suficientes para gerar uma análise consolidada.",
     principaisTemas: [],
     aplicacoesPraticas: [],
     oportunidades: [],
     quantidadeRespostasAnalisadas: quantidade,
     status: "desatualizado",
     updatedAt: null,
-    modelo: getAiProviderStatus().model || ""
+    modelo: getAiProviderStatus().model || "",
   };
 }
 
-function getCachedInsightForQuestion(questionId: QuestionId, submissions: Submission[], cache: Record<string, CachedInsight>): CachedInsight {
+function getCachedInsightForQuestion(
+  questionId: QuestionId,
+  submissions: Submission[],
+  cache: Record<string, CachedInsight>,
+): CachedInsight {
   const existing = cache[questionId];
   if (existing) {
     return {
       ...existing,
-      principaisTemas: questionId === "principal_aprendizado" ? existing.principaisTemas : [],
-      aplicacoesPraticas: questionId === "pratica_pretende_aplicar" ? existing.aplicacoesPraticas : [],
-      oportunidades: questionId === "recomendacao_estrategica_ren" ? existing.oportunidades : []
+      principaisTemas:
+        questionId === "principal_aprendizado" ? existing.principaisTemas : [],
+      aplicacoesPraticas:
+        questionId === "pratica_pretende_aplicar"
+          ? existing.aplicacoesPraticas
+          : [],
+      oportunidades:
+        questionId === "recomendacao_estrategica_ren"
+          ? existing.oportunidades
+          : [],
     };
   }
 
   const responseState = getRelevantResponseState(questionId, submissions);
   return buildPlaceholderInsight(questionId, responseState.count);
 }
-function getRelevantResponseState(questionId: QuestionId, submissions: Submission[]) {
+function getRelevantResponseState(
+  questionId: QuestionId,
+  submissions: Submission[],
+) {
   const config = QUESTION_CONFIGS[questionId];
   const entries = submissions
     .map((submission) => ({
       id: normalizeString(submission.id),
       response: getStringCandidate(submission, config.fieldCandidates),
-      updatedAtMs: toMillis(submission.updatedAt || submission.createdAt || submission.updatedAtLocal || submission.createdAtLocal)
+      updatedAtMs: toMillis(
+        submission.updatedAt ||
+          submission.createdAt ||
+          submission.updatedAtLocal ||
+          submission.createdAtLocal,
+      ),
     }))
     .filter((entry) => entry.response)
     .sort((a, b) => a.id.localeCompare(b.id));
-  const latestResponseAtMs = Math.max(0, ...entries.map((entry) => entry.updatedAtMs));
+  const latestResponseAtMs = Math.max(
+    0,
+    ...entries.map((entry) => entry.updatedAtMs),
+  );
 
   return {
     count: entries.length,
@@ -441,16 +605,23 @@ function getRelevantResponseState(questionId: QuestionId, submissions: Submissio
       .createHash("sha256")
       .update(JSON.stringify(entries.map(({ id, response }) => [id, response])))
       .digest("hex"),
-    latestResponseAt: latestResponseAtMs ? new Date(latestResponseAtMs).toISOString() : null,
-    promptResponses: uniqueStrings(entries.map((entry) => truncate(entry.response, 320))).slice(0, 60)
+    latestResponseAt: latestResponseAtMs
+      ? new Date(latestResponseAtMs).toISOString()
+      : null,
+    promptResponses: uniqueStrings(
+      entries.map((entry) => truncate(entry.response, 320)),
+    ).slice(0, 60),
   };
 }
 
 async function generateInsight(
   questionId: QuestionId,
-  responseState: ReturnType<typeof getRelevantResponseState>
+  responseState: ReturnType<typeof getRelevantResponseState>,
 ): Promise<CachedInsight> {
-  const prompt = buildPromptForQuestion(questionId, responseState.promptResponses);
+  const prompt = buildPromptForQuestion(
+    questionId,
+    responseState.promptResponses,
+  );
   const raw = await generateStructuredResponse(prompt);
   const parsed = parseJsonResponse(raw);
   return buildInsightFromParsed(
@@ -458,17 +629,21 @@ async function generateInsight(
     parsed,
     responseState.count,
     responseState.fingerprint,
-    responseState.latestResponseAt
+    responseState.latestResponseAt,
   );
 }
 
-async function ensureInsight(questionId: QuestionId, submissions: Submission[], cache: Record<string, CachedInsight>): Promise<CachedInsight> {
+async function ensureInsight(
+  questionId: QuestionId,
+  submissions: Submission[],
+  cache: Record<string, CachedInsight>,
+): Promise<CachedInsight> {
   const existing = cache[questionId];
   const responseState = getRelevantResponseState(questionId, submissions);
   if (
-    existing
-    && existing.responsesFingerprint === responseState.fingerprint
-    && existing.status === "atualizado"
+    existing &&
+    existing.responsesFingerprint === responseState.fingerprint &&
+    existing.status === "atualizado"
   ) {
     return existing;
   }
@@ -496,46 +671,97 @@ async function ensureInsight(questionId: QuestionId, submissions: Submission[], 
   }
 }
 
-function aggregateReport(submissions: Submission[], insights: CachedInsight[]): ReportPayload {
+function aggregateReport(
+  submissions: Submission[],
+  insights: CachedInsight[],
+): ReportPayload {
   const totalRespostas = submissions.length;
   const activityCounts = new Map<string, number>();
   const initiativeCounts = new Map<string, number>();
-  const probabilityCounts = new Map<number, number>([[1, 0], [2, 0], [3, 0], [4, 0], [5, 0]]);
+  const probabilityCounts = new Map<number, number>([
+    [1, 0],
+    [2, 0],
+    [3, 0],
+    [4, 0],
+    [5, 0],
+  ]);
 
   submissions.forEach((item) => {
-    const activity = normalizeString(item.atividadeMaiorValor) || "Não informado";
+    const activity =
+      normalizeString(item.atividadeMaiorValor) || "Não informado";
     activityCounts.set(activity, (activityCounts.get(activity) || 0) + 1);
 
     const probability = Number(item.probabilidadeAplicacao) || 0;
     if (probabilityCounts.has(probability)) {
-      probabilityCounts.set(probability, (probabilityCounts.get(probability) || 0) + 1);
+      probabilityCounts.set(
+        probability,
+        (probabilityCounts.get(probability) || 0) + 1,
+      );
     }
 
     const initiatives = formatListValue(item.iniciativaPrioritariaREN);
     if (initiatives.length) {
       initiatives.forEach((initiative) => {
-        initiativeCounts.set(initiative, (initiativeCounts.get(initiative) || 0) + 1);
+        initiativeCounts.set(
+          initiative,
+          (initiativeCounts.get(initiative) || 0) + 1,
+        );
       });
     } else {
-      initiativeCounts.set("Não informado", (initiativeCounts.get("Não informado") || 0) + 1);
+      initiativeCounts.set(
+        "Não informado",
+        (initiativeCounts.get("Não informado") || 0) + 1,
+      );
     }
   });
 
-  const activityEntries = Array.from(activityCounts.entries()).map(([nome, total]) => ({ nome, total }));
-  const initiativeEntries = Array.from(initiativeCounts.entries()).map(([nome, total]) => ({ nome, total }));
-  const probabilityEntries = Array.from(probabilityCounts.entries()).map(([nota, total]) => ({ nota, total }));
+  const activityEntries = Array.from(activityCounts.entries()).map(
+    ([nome, total]) => ({ nome, total }),
+  );
+  const initiativeEntries = Array.from(initiativeCounts.entries()).map(
+    ([nome, total]) => ({ nome, total }),
+  );
+  const probabilityEntries = Array.from(probabilityCounts.entries()).map(
+    ([nota, total]) => ({ nota, total }),
+  );
   const averageProbability = totalRespostas
-    ? Number((submissions.reduce((acc, item) => acc + (Number(item.probabilidadeAplicacao) || 0), 0) / totalRespostas).toFixed(1))
+    ? Number(
+        (
+          submissions.reduce(
+            (acc, item) => acc + (Number(item.probabilidadeAplicacao) || 0),
+            0,
+          ) / totalRespostas
+        ).toFixed(1),
+      )
     : 0;
 
   const topByCount = (entries: Array<{ nome: string; total: number }>) => {
     if (!entries.length) return "Sem dados";
-    return entries.slice().sort((a, b) => b.total - a.total)[0]?.nome || "Sem dados";
+    return (
+      entries.slice().sort((a, b) => b.total - a.total)[0]?.nome || "Sem dados"
+    );
   };
 
-  const latestSubmission = submissions.slice().sort((a, b) => toMillis(b.updatedAt || b.createdAt || b.updatedAtLocal || b.createdAtLocal) - toMillis(a.updatedAt || a.createdAt || a.updatedAtLocal || a.createdAtLocal))[0];
+  const latestSubmission = submissions
+    .slice()
+    .sort(
+      (a, b) =>
+        toMillis(
+          b.updatedAt || b.createdAt || b.updatedAtLocal || b.createdAtLocal,
+        ) -
+        toMillis(
+          a.updatedAt || a.createdAt || a.updatedAtLocal || a.createdAtLocal,
+        ),
+    )[0];
   const latestTimestamp = latestSubmission
-    ? new Date(toMillis(latestSubmission.updatedAt || latestSubmission.createdAt || latestSubmission.updatedAtLocal || latestSubmission.createdAtLocal)).toISOString()
+    ? new Date(
+        toMillis(
+          latestSubmission.updatedAt ||
+            latestSubmission.createdAt ||
+            latestSubmission.updatedAtLocal ||
+            latestSubmission.createdAtLocal,
+        ),
+      ).toISOString()
     : new Date().toISOString();
 
   return {
@@ -543,15 +769,15 @@ function aggregateReport(submissions: Submission[], insights: CachedInsight[]): 
       totalRespostas,
       atividadeMaisValorizada: topByCount(activityEntries),
       mediaProbabilidadeAplicacao: averageProbability,
-      iniciativaMaisVotada: topByCount(initiativeEntries)
+      iniciativaMaisVotada: topByCount(initiativeEntries),
     },
     graficos: {
       atividades: activityEntries.sort((a, b) => b.total - a.total),
       probabilidadeAplicacao: probabilityEntries,
-      iniciativas: initiativeEntries.sort((a, b) => b.total - a.total)
+      iniciativas: initiativeEntries.sort((a, b) => b.total - a.total),
     },
     insights,
-    updatedAt: latestTimestamp
+    updatedAt: latestTimestamp,
   };
 }
 
@@ -562,9 +788,16 @@ tryInitAdminDb();
 app.post("/api/ai/improve", async (req, res) => {
   const now = Date.now();
   const clientIp = req.ip || req.socket.remoteAddress || "unknown";
-  const recentRequests = (aiRequestsByIp.get(clientIp) || []).filter((timestamp) => now - timestamp < AI_RATE_LIMIT_WINDOW_MS);
+  const recentRequests = (aiRequestsByIp.get(clientIp) || []).filter(
+    (timestamp) => now - timestamp < AI_RATE_LIMIT_WINDOW_MS,
+  );
   if (recentRequests.length >= AI_RATE_LIMIT_MAX_REQUESTS) {
-    return res.status(429).json({ message: "Limite de aprimoramentos atingido. Tente novamente em alguns instantes." });
+    return res
+      .status(429)
+      .json({
+        message:
+          "Limite de aprimoramentos atingido. Tente novamente em alguns instantes.",
+      });
   }
   recentRequests.push(now);
   aiRequestsByIp.set(clientIp, recentRequests);
@@ -573,10 +806,14 @@ app.post("/api/ai/improve", async (req, res) => {
   const answer = normalizeString(req.body?.answer);
 
   if (!question || !answer) {
-    return res.status(400).json({ message: "Pergunta e resposta são obrigatórias." });
+    return res
+      .status(400)
+      .json({ message: "Pergunta e resposta são obrigatórias." });
   }
   if (answer.length < 10 || answer.length > 2_000) {
-    return res.status(400).json({ message: "A resposta deve ter entre 10 e 2.000 caracteres." });
+    return res
+      .status(400)
+      .json({ message: "A resposta deve ter entre 10 e 2.000 caracteres." });
   }
   if (question.length > 1_000) {
     return res.status(400).json({ message: "Pergunta inválida." });
@@ -584,7 +821,12 @@ app.post("/api/ai/improve", async (req, res) => {
 
   const providerStatus = getAiProviderStatus();
   if (!providerStatus.configured) {
-    return res.status(503).json({ code: "AI_NOT_CONFIGURED", message: "O assistente de IA ainda não foi configurado no servidor." });
+    return res
+      .status(503)
+      .json({
+        code: "AI_NOT_CONFIGURED",
+        message: "O assistente de IA ainda não foi configurado no servidor.",
+      });
   }
 
   try {
@@ -597,8 +839,16 @@ app.post("/api/ai/improve", async (req, res) => {
       : /timeout|abort/i.test(errorMessage)
         ? "timeout"
         : "provider_request_failed";
-    console.error(`[AI] provider=${providerStatus.provider} model=${providerStatus.model} code=${code}`);
-    return res.status(503).json({ code: "AI_PROVIDER_UNAVAILABLE", message: "Não foi possível aprimorar sua resposta. Tente novamente em alguns instantes." });
+    console.error(
+      `[AI] provider=${providerStatus.provider} model=${providerStatus.model} code=${code}`,
+    );
+    return res
+      .status(503)
+      .json({
+        code: "AI_PROVIDER_UNAVAILABLE",
+        message:
+          "Não foi possível aprimorar sua resposta. Tente novamente em alguns instantes.",
+      });
   }
 });
 
@@ -609,28 +859,54 @@ app.post("/api/respostas", async (req, res) => {
   const selectedInitiatives = normalizeArray(data.iniciativaPrioritariaREN);
   const initiativeOther = normalizeString(data.iniciativaPrioritariaRENOutro);
 
-  if (!activity || !normalizeString(data.principalAprendizado) || !Number(data.probabilidadeAplicacao) || !normalizeString(data.praticaPretendeAplicar) || selectedInitiatives.length === 0 || !normalizeString(data.recomendacaoEstrategicaREN)) {
-    return res.status(400).json({ success: false, message: "Por favor, responda todas as seis perguntas antes de enviar." });
+  if (
+    !activity ||
+    !normalizeString(data.principalAprendizado) ||
+    !Number(data.probabilidadeAplicacao) ||
+    !normalizeString(data.praticaPretendeAplicar) ||
+    selectedInitiatives.length === 0 ||
+    !normalizeString(data.recomendacaoEstrategicaREN)
+  ) {
+    return res
+      .status(400)
+      .json({
+        success: false,
+        message: "Por favor, responda todas as seis perguntas antes de enviar.",
+      });
   }
   if (activity === "Outro" && !activityOther) {
-    return res.status(400).json({ success: false, message: "Informe qual foi a outra atividade." });
+    return res
+      .status(400)
+      .json({ success: false, message: "Informe qual foi a outra atividade." });
   }
   if (selectedInitiatives.includes("Outro") && !initiativeOther) {
-    return res.status(400).json({ success: false, message: "Informe qual é a outra iniciativa prioritária." });
+    return res
+      .status(400)
+      .json({
+        success: false,
+        message: "Informe qual é a outra iniciativa prioritária.",
+      });
   }
 
   try {
     const timestamp = new Date().toISOString();
-    const submission = normalizeSubmission({ ...data, id: data.id || `res_${crypto.randomUUID()}` }, { createdAt: timestamp, updatedAt: timestamp });
+    const submission = normalizeSubmission(
+      { ...data, id: data.id || `res_${crypto.randomUUID()}` },
+      { createdAt: timestamp, updatedAt: timestamp },
+    );
     await saveSubmission(submission);
-    return res.json({ success: true, message: "Resposta enviada com sucesso!", id: submission.id });
+    return res.json({
+      success: true,
+      message: "Resposta enviada com sucesso!",
+      id: submission.id,
+    });
   } catch (error) {
     console.error("Erro ao gravar resposta:", error);
     return res.status(isFirestoreConfigError(error) ? 503 : 500).json({
       success: false,
       message: isFirestoreConfigError(error)
         ? getFirestoreConfigMessage()
-        : "Não foi possível gravar a resposta no servidor. Tente novamente."
+        : "Não foi possível gravar a resposta no servidor. Tente novamente.",
     });
   }
 });
@@ -639,7 +915,10 @@ app.get("/api/report", async (_req, res) => {
   try {
     const submissions = await readSubmissions();
     const cache = await readAnalysesCache();
-    const insights = (Object.keys(QUESTION_CONFIGS) as QuestionId[]).map((questionId) => getCachedInsightForQuestion(questionId, submissions, cache));
+    const insights = (Object.keys(QUESTION_CONFIGS) as QuestionId[]).map(
+      (questionId) =>
+        getCachedInsightForQuestion(questionId, submissions, cache),
+    );
 
     return res.json(aggregateReport(submissions, insights));
   } catch (error) {
@@ -647,7 +926,7 @@ app.get("/api/report", async (_req, res) => {
     return res.status(isFirestoreConfigError(error) ? 503 : 500).json({
       message: isFirestoreConfigError(error)
         ? getFirestoreConfigMessage()
-        : "Não foi possível carregar os resultados neste momento."
+        : "Não foi possível carregar os resultados neste momento.",
     });
   }
 });
@@ -662,9 +941,16 @@ app.post("/api/report/refresh", async (_req, res) => {
       const insight = await ensureInsight(questionId, submissions, cache);
       insights.push({
         ...insight,
-        principaisTemas: questionId === "principal_aprendizado" ? insight.principaisTemas : [],
-        aplicacoesPraticas: questionId === "pratica_pretende_aplicar" ? insight.aplicacoesPraticas : [],
-        oportunidades: questionId === "recomendacao_estrategica_ren" ? insight.oportunidades : []
+        principaisTemas:
+          questionId === "principal_aprendizado" ? insight.principaisTemas : [],
+        aplicacoesPraticas:
+          questionId === "pratica_pretende_aplicar"
+            ? insight.aplicacoesPraticas
+            : [],
+        oportunidades:
+          questionId === "recomendacao_estrategica_ren"
+            ? insight.oportunidades
+            : [],
       });
     }
 
@@ -674,7 +960,7 @@ app.post("/api/report/refresh", async (_req, res) => {
     return res.status(isFirestoreConfigError(error) ? 503 : 500).json({
       message: isFirestoreConfigError(error)
         ? getFirestoreConfigMessage()
-        : "Não foi possível atualizar os aprendizados no momento."
+        : "Não foi possível atualizar os aprendizados no momento.",
     });
   }
 });
@@ -687,26 +973,35 @@ app.post("/api/report/insights/generate", async (req, res) => {
 
   try {
     const submissions = await readSubmissions();
-    const insight = await ensureInsight(questionId, submissions, await readAnalysesCache());
+    const insight = await ensureInsight(
+      questionId,
+      submissions,
+      await readAnalysesCache(),
+    );
     return res.json(insight);
   } catch (error) {
     console.error("Erro ao gerar insight:", error);
     return res.status(isFirestoreConfigError(error) ? 503 : 500).json({
       message: isFirestoreConfigError(error)
         ? getFirestoreConfigMessage()
-        : "Não foi possível gerar o insight solicitado."
+        : "Não foi possível gerar o insight solicitado.",
     });
   }
 });
 
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get("*", (_req, res) => res.sendFile(path.join(distPath, "index.html")));
+    app.get("*", (_req, res) =>
+      res.sendFile(path.join(distPath, "index.html")),
+    );
   }
 
   app.listen(PORT, "0.0.0.0", () => {
@@ -715,14 +1010,3 @@ async function startServer() {
 }
 
 startServer().catch((err) => console.error("Falha ao iniciar servidor:", err));
-
-
-
-
-
-
-
-
-
-
-
