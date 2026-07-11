@@ -45,27 +45,27 @@ export default function ReviewScreen({ data, onJumpToQuestion }: ReviewScreenPro
     {
       title: "Principal aprendizado",
       questionNumber: 2,
-      value: data.principalAprendizado || "NÃ£o respondido"
+      value: data.principalAprendizado || "Não respondido"
     },
     {
-      title: "Probabilidade de aplicaÃ§Ã£o",
+      title: "Probabilidade de aplicação",
       questionNumber: 3,
-      value: data.probabilidadeAplicacao ? `${data.probabilidadeAplicacao} / 5` : "NÃ£o respondido"
+      value: data.probabilidadeAplicacao ? `${data.probabilidadeAplicacao} / 5` : "Não respondido"
     },
     {
-      title: "PrÃ¡tica que pretende aplicar",
+      title: "Prática que pretende aplicar",
       questionNumber: 4,
-      value: data.praticaPretendeAplicar || "NÃ£o respondido"
+      value: data.praticaPretendeAplicar || "Não respondido"
     },
     {
-      title: "Iniciativas prioritÃ¡rias da REN",
+      title: "Iniciativas prioritárias da REN",
       questionNumber: 5,
       value: formatInitiatives(data)
     },
     {
-      title: "RecomendaÃ§Ã£o estratÃ©gica",
+      title: "Recomendação estratégica",
       questionNumber: 6,
-      value: data.recomendacaoEstrategicaREN || "NÃ£o respondido"
+      value: data.recomendacaoEstrategicaREN || "Não respondido"
     }
   ];
 
@@ -73,7 +73,7 @@ export default function ReviewScreen({ data, onJumpToQuestion }: ReviewScreenPro
     <div className="space-y-6" id="review-screen">
       <div className="text-center max-w-2xl mx-auto">
         <h3 className="text-xl sm:text-2xl font-display font-black text-neutral-800">Resumo das respostas</h3>
-        <p className="text-sm text-neutral-500 mt-2">Revise as respostas antes de enviar. VocÃª pode editar qualquer item clicando em editar.</p>
+        <p className="text-sm text-neutral-500 mt-2">Revise as respostas antes de enviar. Você pode editar qualquer item clicando em editar.</p>
       </div>
 
       <div className="space-y-3">
@@ -95,8 +95,8 @@ export default function ReviewScreen({ data, onJumpToQuestion }: ReviewScreenPro
         <div className="flex items-start gap-3">
           <FileText className="h-6 w-6 text-brand-dark shrink-0" />
           <div>
-            <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-brand-dark">ConfirmaÃ§Ã£o</h5>
-            <p className="text-sm text-neutral-600">Ao confirmar o envio, suas respostas serÃ£o registradas para a anÃ¡lise estratÃ©gica do FÃ³rum.</p>
+            <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-brand-dark">Confirmação</h5>
+            <p className="text-sm text-neutral-600">Ao confirmar o envio, suas respostas serão registradas para a análise estratégica do Fórum.</p>
           </div>
         </div>
       </div>

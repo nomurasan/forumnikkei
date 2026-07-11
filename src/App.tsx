@@ -158,7 +158,7 @@ export default function App() {
   const [isEditingFromReview, setIsEditingFromReview] = useState(false);
   const [aiAnswers, setAiAnswers] = useState<Record<OpenAnswerField, AiAnswerState>>(createEmptyAiAnswers);
 
-  const stepNames = ["ApresentaÃ§Ã£o", "Parte 1", "Parte 2", "Resumo", "Sucesso"];
+  const stepNames = ["Apresentação", "Parte 1", "Parte 2", "Resumo", "Sucesso"];
   const currentQuestionUsesChoice = [1, 3].includes(activeQuestion);
   const currentChoiceValue = currentQuestionUsesChoice ? (activeQuestion === 1 ? formData.atividadeMaiorValor : formData.probabilidadeAplicacao) : null;
   const mainAlignmentClass = step === 1 ? "justify-center" : "justify-start";
@@ -227,7 +227,7 @@ export default function App() {
       try {
         localStorage.setItem("forum_nikkei_draft", JSON.stringify(formData));
       } catch (e) {
-        console.warn("NÃ£o foi possÃ­vel salvar o rascunho:", e);
+        console.warn("Não foi possível salvar o rascunho:", e);
       }
     }
   }, [formData, step]);
@@ -242,7 +242,7 @@ export default function App() {
       try {
         localStorage.removeItem("forum_nikkei_draft");
       } catch (e) {
-        console.warn("NÃ£o foi possÃ­vel limpar o rascunho:", e);
+        console.warn("Não foi possível limpar o rascunho:", e);
       }
     }
     setActiveQuestion(nextQuestion);
@@ -298,11 +298,11 @@ export default function App() {
       const data = await response.json();
       if (!response.ok) {
         const message = data?.code === "AI_NOT_CONFIGURED"
-          ? "O assistente de IA ainda nÃ£o foi configurado. Contate o administrador."
-          : data?.message || "NÃ£o foi possÃ­vel aprimorar sua resposta. Tente novamente em alguns instantes.";
+          ? "O assistente de IA ainda não foi configurado. Contate o administrador."
+          : data?.message || "Não foi possível aprimorar sua resposta. Tente novamente em alguns instantes.";
         throw new Error(message);
       }
-      if (typeof data.improvedAnswer !== "string" || !data.improvedAnswer.trim()) throw new Error("Resposta invÃ¡lida");
+      if (typeof data.improvedAnswer !== "string" || !data.improvedAnswer.trim()) throw new Error("Resposta inválida");
 
       const improvedAnswer = data.improvedAnswer.trim();
       setFormData((prev) => ({ ...prev, [field]: improvedAnswer }));
@@ -322,7 +322,7 @@ export default function App() {
         [field]: {
           ...prev[field],
           loading: false,
-          error: error instanceof Error ? error.message : "NÃ£o foi possÃ­vel aprimorar sua resposta. Tente novamente em alguns instantes."
+          error: error instanceof Error ? error.message : "Não foi possível aprimorar sua resposta. Tente novamente em alguns instantes."
         }
       }));
     }
@@ -350,7 +350,7 @@ export default function App() {
 
     if (questionNumber === 2) {
       if (!formData.principalAprendizado.trim()) {
-        currentErrors.principalAprendizado = "Este campo Ã© obrigatÃ³rio.";
+        currentErrors.principalAprendizado = "Este campo é obrigatório.";
       }
     }
 
@@ -362,13 +362,13 @@ export default function App() {
 
     if (questionNumber === 4) {
       if (!formData.praticaPretendeAplicar.trim()) {
-        currentErrors.praticaPretendeAplicar = "Este campo Ã© obrigatÃ³rio.";
+        currentErrors.praticaPretendeAplicar = "Este campo é obrigatório.";
       }
     }
 
     if (questionNumber === 5) {
       if (getInitiativeSelections(formData.iniciativaPrioritariaREN).length === 0) {
-        currentErrors.iniciativaPrioritariaREN = "Selecione de 1 a 3 iniciativas prioritÃ¡rias.";
+        currentErrors.iniciativaPrioritariaREN = "Selecione de 1 a 3 iniciativas prioritárias.";
       } else if (
         getInitiativeSelections(formData.iniciativaPrioritariaREN).includes("Outro")
         && !formData.iniciativaPrioritariaRENOutro.trim()
@@ -379,7 +379,7 @@ export default function App() {
 
     if (questionNumber === 6) {
       if (!formData.recomendacaoEstrategicaREN.trim()) {
-        currentErrors.recomendacaoEstrategicaREN = "Este campo Ã© obrigatÃ³rio.";
+        currentErrors.recomendacaoEstrategicaREN = "Este campo é obrigatório.";
       }
     }
 
@@ -584,16 +584,16 @@ export default function App() {
             <div className="h-8 w-[1px] bg-neutral-200 hidden md:block" />
             <div className="hidden md:flex flex-col">
               <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-brand-red leading-tight">
-                FÃ³rum Empresarial Nikkei Brasil-JapÃ£o
+                Fórum Empresarial Nikkei Brasil-Japão
               </span>
               <h1 className="text-xs font-display font-bold text-neutral-500 tracking-tight">
-                Captura de aprendizados e recomendaÃ§Ãµes
+                Captura de aprendizados e recomendações
               </h1>
             </div>
           </div>
           <div className="hidden sm:flex items-center gap-2 bg-neutral-50 border border-neutral-200/60 rounded-full px-3 py-1.5 text-[10px] text-neutral-500 font-mono font-bold uppercase tracking-wider">
             <span className="w-2 h-2 rounded-full bg-brand-red animate-pulse" />
-            QuestionÃ¡rio 2026
+            Questionário 2026
           </div>
         </div>
       </header>
@@ -606,9 +606,9 @@ export default function App() {
             <div className="border-b border-neutral-100 bg-neutral-50/70 px-6 py-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-brand-red">FÃ³rum Empresarial Nikkei Brasil-JapÃ£o</p>
+                  <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-brand-red">Fórum Empresarial Nikkei Brasil-Japão</p>
                   <h2 className="text-lg font-display font-black text-neutral-800">
-                    {step === 2 ? "Parte 1 - Aprendizados e aplicaÃ§Ã£o" : step === 3 ? "Parte 2 - RecomendaÃ§Ãµes estratÃ©gicas" : "Resumo das respostas"}
+                    {step === 2 ? "Parte 1 - Aprendizados e aplicação" : step === 3 ? "Parte 2 - Recomendações estratégicas" : "Resumo das respostas"}
                   </h2>
                 </div>
                 <div className="text-right text-xs text-neutral-500">
@@ -628,8 +628,8 @@ export default function App() {
                     <ChatQuestion
                       number={1}
                       icon={<Sparkles className="h-3.5 w-3.5" />}
-                        question="Qual atividade do FÃ³rum gerou maior valor para vocÃª?"
-                        helper="Escolha a opÃ§Ã£o que melhor representa sua percepÃ§Ã£o."
+                        question="Qual atividade do Fórum gerou maior valor para você?"
+                        helper="Escolha a opção que melhor representa sua percepção."
                       error={errors.atividadeMaiorValor || errors.atividadeMaiorValorOutro}
                     >
                       <div className="grid gap-3">
@@ -669,7 +669,7 @@ export default function App() {
                     <ChatQuestion
                       number={2}
                       icon={<Lightbulb className="h-3.5 w-3.5" />}
-                      question="Qual foi o principal aprendizado que vocÃª leva deste FÃ³rum e por que ele foi significativo para vocÃª?"
+                      question="Qual foi o principal aprendizado que você leva deste Fórum e por que ele foi significativo para você?"
                       helper="Registre sua resposta em formato livre, como se estivesse conversando com a REN Brasil."
                       error={errors.principalAprendizado}
                     >
@@ -678,7 +678,7 @@ export default function App() {
                         onChange={(value) => handleFieldChange("principalAprendizado", value)}
                         placeholder="Digite aqui seu principal aprendizado e por que ele foi importante."
                         aiState={aiAnswers.principalAprendizado}
-                        onImprove={() => handleImproveAnswer("principalAprendizado", "Qual foi o principal aprendizado que vocÃª leva deste FÃ³rum e por que ele foi significativo para vocÃª?")}
+                        onImprove={() => handleImproveAnswer("principalAprendizado", "Qual foi o principal aprendizado que você leva deste Fórum e por que ele foi significativo para você?")}
                         onRestore={() => handleRestoreAnswer("principalAprendizado")}
                       />
                     </ChatQuestion>
@@ -688,7 +688,7 @@ export default function App() {
                     <ChatQuestion
                       number={3}
                       icon={<Star className="h-3.5 w-3.5" />}
-                      question="ApÃ³s participar do FÃ³rum, qual Ã© a probabilidade de aplicar algum aprendizado em sua empresa ou organizaÃ§Ã£o?"
+                      question="Após participar do Fórum, qual é a probabilidade de aplicar algum aprendizado em sua empresa ou organização?"
                       helper="Selecione uma nota de 1 a 5."
                       error={errors.probabilidadeAplicacao}
                     >
@@ -720,16 +720,16 @@ export default function App() {
                     <ChatQuestion
                       number={4}
                       icon={<Compass className="h-3.5 w-3.5" />}
-                      question="Qual prÃ¡tica apresentada pela Toyota ou discutida durante o FÃ³rum vocÃª pretende aplicar em sua empresa ou organizaÃ§Ã£o?"
-                      helper="Escreva a prÃ¡tica, conceito ou comportamento que pretende levar para sua rotina."
+                      question="Qual prática apresentada pela Toyota ou discutida durante o Fórum você pretende aplicar em sua empresa ou organização?"
+                      helper="Escreva a prática, conceito ou comportamento que pretende levar para sua rotina."
                       error={errors.praticaPretendeAplicar}
                     >
                       <AssistedTextarea
                         value={formData.praticaPretendeAplicar}
                         onChange={(value) => handleFieldChange("praticaPretendeAplicar", value)}
-                        placeholder="Digite aqui a prÃ¡tica ou conceito que vocÃª pretende aplicar."
+                        placeholder="Digite aqui a prática ou conceito que você pretende aplicar."
                         aiState={aiAnswers.praticaPretendeAplicar}
-                        onImprove={() => handleImproveAnswer("praticaPretendeAplicar", "Qual prÃ¡tica apresentada pela Toyota ou discutida durante o FÃ³rum vocÃª pretende aplicar em sua empresa ou organizaÃ§Ã£o?")}
+                        onImprove={() => handleImproveAnswer("praticaPretendeAplicar", "Qual prática apresentada pela Toyota ou discutida durante o Fórum você pretende aplicar em sua empresa ou organização?")}
                         onRestore={() => handleRestoreAnswer("praticaPretendeAplicar")}
                       />
                     </ChatQuestion>
@@ -740,8 +740,8 @@ export default function App() {
                     <ChatQuestion
                       number={5}
                       icon={<Sparkles className="h-3.5 w-3.5" />}
-                      question="Quais iniciativas da REN Brasil podem gerar mais valor para vocÃª ou sua organizaÃ§Ã£o nos prÃ³ximos dois anos?"
-                      helper="Selecione atÃ© 3 iniciativas com maior potencial na sua visÃ£o."
+                      question="Quais iniciativas da REN Brasil podem gerar mais valor para você ou sua organização nos próximos dois anos?"
+                      helper="Selecione até 3 iniciativas com maior potencial na sua visão."
                       error={errors.iniciativaPrioritariaREN || errors.iniciativaPrioritariaRENOutro}
                     >
                       <div className="mb-3 text-xs font-semibold text-neutral-500">
@@ -791,16 +791,16 @@ export default function App() {
                     <ChatQuestion
                       number={6}
                       icon={<Lightbulb className="h-3.5 w-3.5" />}
-                      question="Considerando os aprendizados do FÃ³rum, qual iniciativa a REN Brasil deveria liderar para fortalecer as relaÃ§Ãµes empresariais entre Brasil, JapÃ£o e AmÃ©rica Latina?"
-                      helper="Explique sua proposta com o nÃ­vel de detalhe que achar necessÃ¡rio."
+                      question="Considerando os aprendizados do Fórum, qual iniciativa a REN Brasil deveria liderar para fortalecer as relações empresariais entre Brasil, Japão e América Latina?"
+                      helper="Explique sua proposta com o nível de detalhe que achar necessário."
                       error={errors.recomendacaoEstrategicaREN}
                     >
                       <AssistedTextarea
                         value={formData.recomendacaoEstrategicaREN}
                         onChange={(value) => handleFieldChange("recomendacaoEstrategicaREN", value)}
-                        placeholder="Digite aqui sua proposta de iniciativa estratÃ©gica para a REN Brasil."
+                        placeholder="Digite aqui sua proposta de iniciativa estratégica para a REN Brasil."
                         aiState={aiAnswers.recomendacaoEstrategicaREN}
-                        onImprove={() => handleImproveAnswer("recomendacaoEstrategicaREN", "Considerando os aprendizados do FÃ³rum, qual iniciativa a REN Brasil deveria liderar para fortalecer as relaÃ§Ãµes empresariais entre Brasil, JapÃ£o e AmÃ©rica Latina?")}
+                        onImprove={() => handleImproveAnswer("recomendacaoEstrategicaREN", "Considerando os aprendizados do Fórum, qual iniciativa a REN Brasil deveria liderar para fortalecer as relações empresariais entre Brasil, Japão e América Latina?")}
                         onRestore={() => handleRestoreAnswer("recomendacaoEstrategicaREN")}
                       />
                     </ChatQuestion>
@@ -831,7 +831,7 @@ export default function App() {
                       disabled={!currentChoiceValue}
                       className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition ${currentChoiceValue ? "bg-brand-red text-white hover:bg-brand-red-hover" : "bg-neutral-100 text-neutral-500"}`}
                     >
-                      {currentChoiceValue ? (isEditingFromReview ? "Confirmar" : (isEditingFromReview || activeQuestion === 6 ? "Revisar respostas" : "Continuar")) : "Selecione uma opÃ§Ã£o para continuar"}
+                      {currentChoiceValue ? (isEditingFromReview ? "Confirmar" : (isEditingFromReview || activeQuestion === 6 ? "Revisar respostas" : "Continuar")) : "Selecione uma opção para continuar"}
                       {!currentChoiceValue && null}
                     </button>
                   ) : (
