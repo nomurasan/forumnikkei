@@ -185,10 +185,12 @@ export default function App() {
 
   const getFirstUnansweredQuestion = (data: FormResponse) => {
     if (!data.atividadeMaiorValor.trim()) return 1;
+    if (data.atividadeMaiorValor === "Outro" && !data.atividadeMaiorValorOutro?.trim()) return 1;
     if (!data.principalAprendizado.trim()) return 2;
     if (!data.probabilidadeAplicacao) return 3;
     if (!data.praticaPretendeAplicar.trim()) return 4;
     if (getInitiativeSelections(data.iniciativaPrioritariaREN).length === 0) return 5;
+    if (getInitiativeSelections(data.iniciativaPrioritariaREN).includes("Outro") && !data.iniciativaPrioritariaRENOutro?.trim()) return 5;
     if (!data.recomendacaoEstrategicaREN.trim()) return 6;
     return 6;
   };
@@ -234,7 +236,7 @@ export default function App() {
   const handleStart = (resume: boolean) => {
     let nextQuestion = 1;
     if (resume && draftData) {
-      setFormData({ ...draftData });
+      setFormData({ ...DEFAULT_FORM_VALUES, ...draftData });
       nextQuestion = getFirstUnansweredQuestion(draftData);
     } else {
       setFormData({ ...DEFAULT_FORM_VALUES });
@@ -342,6 +344,8 @@ export default function App() {
     if (questionNumber === 1) {
       if (!formData.atividadeMaiorValor.trim()) {
         currentErrors.atividadeMaiorValor = "Selecione a atividade de maior valor.";
+      } else if (formData.atividadeMaiorValor === "Outro" && !formData.atividadeMaiorValorOutro.trim()) {
+        currentErrors.atividadeMaiorValorOutro = "Informe qual foi a outra atividade.";
       }
     }
 
@@ -366,6 +370,11 @@ export default function App() {
     if (questionNumber === 5) {
       if (getInitiativeSelections(formData.iniciativaPrioritariaREN).length === 0) {
         currentErrors.iniciativaPrioritariaREN = "Selecione de 1 a 3 iniciativas prioritÃ¡rias.";
+      } else if (
+        getInitiativeSelections(formData.iniciativaPrioritariaREN).includes("Outro")
+        && !formData.iniciativaPrioritariaRENOutro.trim()
+      ) {
+        currentErrors.iniciativaPrioritariaRENOutro = "Informe qual é a outra iniciativa.";
       }
     }
 
@@ -397,6 +406,20 @@ export default function App() {
 
   const handleChoiceAnswer = (field: keyof FormResponse, value: string | number, questionNumber: number) => {
     // Only update the value; do NOT auto-advance. User must confirm to proceed.
+    if (field === "atividadeMaiorValor") {
+      setFormData((prev) => ({
+        ...prev,
+        atividadeMaiorValor: String(value),
+        atividadeMaiorValorOutro: value === "Outro" ? prev.atividadeMaiorValorOutro : ""
+      }));
+      setErrors((prev) => {
+        const copy = { ...prev };
+        delete copy.atividadeMaiorValor;
+        delete copy.atividadeMaiorValorOutro;
+        return copy;
+      });
+      return;
+    }
     handleFieldChange(field, value);
   };
 
@@ -410,13 +433,14 @@ export default function App() {
           ? [...selected, value]
           : selected;
 
-      return { ...prev, iniciativaPrioritariaREN: nextSelected };
+      return { ...prev, iniciativaPrioritariaREN: nextSelected, iniciativaPrioritariaRENOutro: nextSelected.includes("Outro") ? prev.iniciativaPrioritariaRENOutro : "" };
     });
 
-    if (errors.iniciativaPrioritariaREN) {
+    if (errors.iniciativaPrioritariaREN || errors.iniciativaPrioritariaRENOutro) {
       setErrors((prev) => {
         const copy = { ...prev };
         delete copy.iniciativaPrioritariaREN;
+        delete copy.iniciativaPrioritariaRENOutro;
         return copy;
       });
     }
@@ -600,14 +624,14 @@ export default function App() {
 
               {step === 2 && (
                 <div className="space-y-8">
-                  {activeQuestion > 1 && <ChatAnswerSummary label="Pergunta 1 respondida" value={formData.atividadeMaiorValor} />}
+                  {activeQuestion > 1 && <ChatAnswerSummary label="Pergunta 1 respondida" value={formatActivityResponse(formData)} />}
                   {activeQuestion === 1 && (
                     <ChatQuestion
                       number={1}
                       icon={<Sparkles className="h-3.5 w-3.5" />}
                         question="Qual atividade do FÃ³rum gerou maior valor para vocÃª?"
                         helper="Escolha a opÃ§Ã£o que melhor representa sua percepÃ§Ã£o."
-                      error={errors.atividadeMaiorValor}
+                      error={errors.atividadeMaiorValor || errors.atividadeMaiorValorOutro}
                     >
                       <div className="grid gap-3">
                         {ATIVIDADES_OPTIONS.map((option) => (
@@ -621,6 +645,23 @@ export default function App() {
                           </button>
                         ))}
                       </div>
+                      {formData.atividadeMaiorValor === "Outro" && (
+                        <div className="mt-4 rounded-xl border border-brand-red/20 bg-brand-red/5 p-4">
+                          <label htmlFor="atividade-maior-valor-outro" className="mb-2 block text-sm font-semibold text-neutral-700">
+                            Qual foi a outra atividade?
+                          </label>
+                          <input
+                            id="atividade-maior-valor-outro"
+                            type="text"
+                            maxLength={200}
+                            autoFocus
+                            value={formData.atividadeMaiorValorOutro}
+                            onChange={(event) => handleFieldChange("atividadeMaiorValorOutro", event.target.value)}
+                            placeholder="Informe a atividade"
+                            className="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm focus:border-brand-red focus:outline-none focus:ring-2 focus:ring-brand-red/20"
+                          />
+                        </div>
+                      )}
                     </ChatQuestion>
                   )}
 
@@ -671,7 +712,7 @@ export default function App() {
 
               {step === 3 && (
                 <div className="space-y-8">
-                  <ChatAnswerSummary label="Pergunta 1 respondida" value={formData.atividadeMaiorValor} />
+                  <ChatAnswerSummary label="Pergunta 1 respondida" value={formatActivityResponse(formData)} />
                   <ChatAnswerSummary label="Pergunta 2 respondida" value={formData.principalAprendizado} />
                   <ChatAnswerSummary label="Pergunta 3 respondida" value={formData.probabilidadeAplicacao ? `${formData.probabilidadeAplicacao}/5` : ""} />
 
@@ -695,14 +736,14 @@ export default function App() {
                     </ChatQuestion>
                   )}
 
-                  {activeQuestion > 5 && <ChatAnswerSummary label="Pergunta 5 respondida" value={formatResponseValue(formData.iniciativaPrioritariaREN)} />}
+                  {activeQuestion > 5 && <ChatAnswerSummary label="Pergunta 5 respondida" value={formatInitiativeResponse(formData)} />}
                   {activeQuestion === 5 && (
                     <ChatQuestion
                       number={5}
                       icon={<Sparkles className="h-3.5 w-3.5" />}
                       question="Quais iniciativas da REN Brasil podem gerar mais valor para vocÃª ou sua organizaÃ§Ã£o nos prÃ³ximos dois anos?"
                       helper="Selecione atÃ© 3 iniciativas com maior potencial na sua visÃ£o."
-                      error={errors.iniciativaPrioritariaREN}
+                      error={errors.iniciativaPrioritariaREN || errors.iniciativaPrioritariaRENOutro}
                     >
                       <div className="mb-3 text-xs font-semibold text-neutral-500">
                         {getInitiativeSelections(formData.iniciativaPrioritariaREN).length}/3 selecionadas
@@ -727,6 +768,23 @@ export default function App() {
                           );
                         })}
                       </div>
+                      {getInitiativeSelections(formData.iniciativaPrioritariaREN).includes("Outro") && (
+                        <div className="mt-4 rounded-xl border border-brand-red/20 bg-brand-red/5 p-4">
+                          <label htmlFor="iniciativa-prioritaria-outro" className="mb-2 block text-sm font-semibold text-neutral-700">
+                            Qual é a outra iniciativa?
+                          </label>
+                          <input
+                            id="iniciativa-prioritaria-outro"
+                            type="text"
+                            maxLength={200}
+                            autoFocus
+                            value={formData.iniciativaPrioritariaRENOutro}
+                            onChange={(event) => handleFieldChange("iniciativaPrioritariaRENOutro", event.target.value)}
+                            placeholder="Informe a iniciativa"
+                            className="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm focus:border-brand-red focus:outline-none focus:ring-2 focus:ring-brand-red/20"
+                          />
+                        </div>
+                      )}
                     </ChatQuestion>
                   )}
 
@@ -814,6 +872,7 @@ export default function App() {
     </div>
   );
 }
+
 
 
 
