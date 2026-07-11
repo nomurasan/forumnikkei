@@ -21,6 +21,7 @@ const PORT = 3000;
 const DATA_DIR = path.join(process.cwd(), "data");
 const SUBMISSIONS_FILE = path.join(DATA_DIR, "respostas.json");
 const ANALYSES_FILE = path.join(DATA_DIR, "report-cache.json");
+const FIREBASE_CONFIG_FILE = path.join(process.cwd(), "firebase-applet-config.json");
 const AI_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const AI_RATE_LIMIT_MAX_REQUESTS = 10;
 const aiRequestsByIp = new Map<string, number[]>();
@@ -86,6 +87,16 @@ const QUESTION_CONFIGS: Record<QuestionId, {
 
 let adminDb: any = null;
 
+function getFirestoreDatabaseId(): string {
+  try {
+    const rawConfig = fs.readFileSync(FIREBASE_CONFIG_FILE, "utf8");
+    const config = JSON.parse(rawConfig);
+    return normalizeString(config.firestoreDatabaseId) || "(default)";
+  } catch {
+    return "(default)";
+  }
+}
+
 function ensureDataFiles() {
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -100,6 +111,7 @@ function ensureDataFiles() {
 
 function tryInitAdminDb() {
   const rawServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "";
+  const databaseId = process.env.FIREBASE_FIRESTORE_DATABASE_ID || getFirestoreDatabaseId();
   try {
     if (rawServiceAccount.trim()) {
       const serviceAccount = JSON.parse(rawServiceAccount);
@@ -110,8 +122,8 @@ function tryInitAdminDb() {
             credential: cert(serviceAccount),
             projectId
           });
-      adminDb = getFirestore(appInstance);
-      console.log("Firebase Admin SDK inicializado com service account.");
+      adminDb = databaseId === "(default)" ? getFirestore(appInstance) : getFirestore(appInstance, databaseId);
+      console.log(`Firebase Admin SDK inicializado com service account. databaseId=${databaseId}`);
       return;
     }
 
@@ -119,8 +131,8 @@ function tryInitAdminDb() {
       const appInstance = getApps().length
         ? getApp()
         : initializeApp({ credential: applicationDefault() });
-      adminDb = getFirestore(appInstance);
-      console.log("Firebase Admin SDK inicializado com credenciais padrão.");
+      adminDb = databaseId === "(default)" ? getFirestore(appInstance) : getFirestore(appInstance, databaseId);
+      console.log(`Firebase Admin SDK inicializado com credenciais padrão. databaseId=${databaseId}`);
       return;
     }
 
