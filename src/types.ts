@@ -7,10 +7,12 @@ export interface FormResponse {
   participanteId: string;
   eventoId: string;
   atividadeMaiorValor: string;
+  atividadeMaiorValorOutro: string;
   principalAprendizado: string;
   probabilidadeAplicacao: number;
   praticaPretendeAplicar: string;
   iniciativaPrioritariaREN: string[];
+  iniciativaPrioritariaRENOutro: string;
   recomendacaoEstrategicaREN: string;
 }
 
@@ -81,9 +83,12 @@ export const DEFAULT_FORM_VALUES: FormResponse = {
   participanteId: "",
   eventoId: "forum_empresarial_nikkei_2026",
   atividadeMaiorValor: "",
+  atividadeMaiorValorOutro: "",
   principalAprendizado: "",
   probabilidadeAplicacao: 0,
   praticaPretendeAplicar: "",
   iniciativaPrioritariaREN: [],
+  iniciativaPrioritariaRENOutro: "",
   recomendacaoEstrategicaREN: ""
 };
+
