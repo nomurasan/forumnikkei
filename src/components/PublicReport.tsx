@@ -201,7 +201,17 @@ export default function PublicReport({ onBackToQuestionnaire }: PublicReportProp
   }, []);
 
   const atividadeChartData = report?.graficos.atividades || [];
-  const probabilidadeChartData = report?.graficos.probabilidadeAplicacao || [];
+  const probabilityLabels: Record<number, string> = {
+    1: "1 - Muito baixa",
+    2: "2 - Baixa",
+    3: "3 - Média",
+    4: "4 - Alta",
+    5: "5 - Muito alta"
+  };
+  const probabilidadeChartData = (report?.graficos.probabilidadeAplicacao || []).map((entry) => ({
+    ...entry,
+    label: probabilityLabels[entry.nota] || String(entry.nota)
+  }));
   const iniciativaChartData = report?.graficos.iniciativas || [];
   const updatedAtLabel = formatUpdatedAt(report?.updatedAt || null);
   const totalRespostas = report?.indicadores.totalRespostas || 0;
@@ -305,7 +315,7 @@ export default function PublicReport({ onBackToQuestionnaire }: PublicReportProp
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={probabilidadeChartData} dataKey="total" nameKey="nota" innerRadius={58} outerRadius={100} paddingAngle={4}>
+                  <Pie data={probabilidadeChartData} dataKey="total" nameKey="label" innerRadius={58} outerRadius={100} paddingAngle={4}>
                     {probabilidadeChartData.map((entry, index) => (
                       <Cell
                         key={`prob-${entry.nota}`}
@@ -373,4 +383,5 @@ export default function PublicReport({ onBackToQuestionnaire }: PublicReportProp
     </div>
   );
 }
+
 
