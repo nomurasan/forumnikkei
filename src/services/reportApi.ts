@@ -11,6 +11,20 @@ export async function fetchPublicReport(signal?: AbortSignal): Promise<PublicRep
   return data as PublicReport;
 }
 
+export async function refreshPublicReport(): Promise<PublicReport> {
+  const response = await fetch("/api/report/refresh", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" }
+  });
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.message || "Não foi possível atualizar os aprendizados.");
+  }
+
+  return data as PublicReport;
+}
+
 export async function regenerateQuestionInsights(questionId: string): Promise<QuestionInsights> {
   const response = await fetch("/api/report/insights/generate", {
     method: "POST",

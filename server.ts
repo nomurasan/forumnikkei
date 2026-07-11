@@ -408,6 +408,21 @@ function buildPlaceholderInsight(questionId: QuestionId, quantidade: number): Ca
     modelo: getAiProviderStatus().model || ""
   };
 }
+
+function getCachedInsightForQuestion(questionId: QuestionId, submissions: Submission[], cache: Record<string, CachedInsight>): CachedInsight {
+  const existing = cache[questionId];
+  if (existing) {
+    return {
+      ...existing,
+      principaisTemas: questionId === "principal_aprendizado" ? existing.principaisTemas : [],
+      aplicacoesPraticas: questionId === "pratica_pretende_aplicar" ? existing.aplicacoesPraticas : [],
+      oportunidades: questionId === "recomendacao_estrategica_ren" ? existing.oportunidades : []
+    };
+  }
+
+  const responseState = getRelevantResponseState(questionId, submissions);
+  return buildPlaceholderInsight(questionId, responseState.count);
+}
 function getRelevantResponseState(questionId: QuestionId, submissions: Submission[]) {
   const config = QUESTION_CONFIGS[questionId];
   const entries = submissions
@@ -624,6 +639,23 @@ app.get("/api/report", async (_req, res) => {
   try {
     const submissions = await readSubmissions();
     const cache = await readAnalysesCache();
+    const insights = (Object.keys(QUESTION_CONFIGS) as QuestionId[]).map((questionId) => getCachedInsightForQuestion(questionId, submissions, cache));
+
+    return res.json(aggregateReport(submissions, insights));
+  } catch (error) {
+    console.error("Erro ao montar relatório público:", error);
+    return res.status(isFirestoreConfigError(error) ? 503 : 500).json({
+      message: isFirestoreConfigError(error)
+        ? getFirestoreConfigMessage()
+        : "Não foi possível carregar os resultados neste momento."
+    });
+  }
+});
+
+app.post("/api/report/refresh", async (_req, res) => {
+  try {
+    const submissions = await readSubmissions();
+    const cache = await readAnalysesCache();
     const insights: CachedInsight[] = [];
 
     for (const questionId of Object.keys(QUESTION_CONFIGS) as QuestionId[]) {
@@ -638,11 +670,11 @@ app.get("/api/report", async (_req, res) => {
 
     return res.json(aggregateReport(submissions, insights));
   } catch (error) {
-    console.error("Erro ao montar relatório público:", error);
+    console.error("Erro ao atualizar relatório público:", error);
     return res.status(isFirestoreConfigError(error) ? 503 : 500).json({
       message: isFirestoreConfigError(error)
         ? getFirestoreConfigMessage()
-        : "Não foi possível carregar os resultados neste momento."
+        : "Não foi possível atualizar os aprendizados no momento."
     });
   }
 });

@@ -24,7 +24,7 @@ import {
   XAxis,
   YAxis
 } from "recharts";
-import { fetchPublicReport } from "../services/reportApi";
+import { fetchPublicReport, refreshPublicReport } from "../services/reportApi";
 import type { PublicReport as PublicReportData, QuestionInsights } from "../types";
 
 interface PublicReportProps {
@@ -177,9 +177,8 @@ export default function PublicReport({ onBackToQuestionnaire }: PublicReportProp
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 
-  const loadReport = async (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true);
-    else setLoading(true);
+  const loadReport = async () => {
+    setLoading(true);
     setError("");
 
     try {
@@ -192,6 +191,19 @@ export default function PublicReport({ onBackToQuestionnaire }: PublicReportProp
       setError(err instanceof Error ? err.message : "Não foi possível carregar os resultados.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRefreshReport = async () => {
+    setRefreshing(true);
+    setError("");
+
+    try {
+      const data = await refreshPublicReport();
+      setReport(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível atualizar os aprendizados.");
+    } finally {
       setRefreshing(false);
     }
   };
@@ -230,7 +242,7 @@ export default function PublicReport({ onBackToQuestionnaire }: PublicReportProp
   }
 
   if (error && !report) {
-    return <ErrorState message={error} onRetry={() => loadReport(true)} />;
+    return <ErrorState message={error} onRetry={loadReport} />;
   }
 
   if (!report) {
@@ -257,14 +269,6 @@ export default function PublicReport({ onBackToQuestionnaire }: PublicReportProp
             >
               <ArrowLeft className="h-4 w-4" />
               Voltar ao questionário
-            </button>
-            <button
-              type="button"
-              onClick={() => loadReport(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-red px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-red-hover"
-            >
-              <RefreshCcw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-              Atualizar relatório
             </button>
           </div>
         </div>
@@ -344,7 +348,7 @@ export default function PublicReport({ onBackToQuestionnaire }: PublicReportProp
                   <XAxis type="number" allowDecimals={false} />
                   <YAxis type="category" dataKey="nome" width={190} tick={{ fontSize: 12 }} />
                   <Tooltip />
-                  <Bar dataKey="total" fill="#1d4ed8" radius={[0, 10, 10, 0]} />
+                  <Bar dataKey="total" fill="#bc002d" radius={[0, 10, 10, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -360,9 +364,20 @@ export default function PublicReport({ onBackToQuestionnaire }: PublicReportProp
                 As respostas individuais permanecem ocultas. A leitura abaixo destaca os padrões recorrentes, os temas mais frequentes e as oportunidades identificadas pela análise.
               </p>
             </div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-neutral-100 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.28em] text-neutral-600">
-              <Brain className="h-3.5 w-3.5" />
-              Síntese por IA
+            <div className="flex flex-col items-stretch gap-2 sm:items-end">
+              <div className="inline-flex items-center gap-2 rounded-full bg-neutral-100 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.28em] text-neutral-600">
+                <Brain className="h-3.5 w-3.5" />
+                Síntese por IA
+              </div>
+              <button
+                type="button"
+                onClick={handleRefreshReport}
+                disabled={refreshing}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-red px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-red-hover disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <RefreshCcw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+                Atualizar relatório
+              </button>
             </div>
           </div>
 
