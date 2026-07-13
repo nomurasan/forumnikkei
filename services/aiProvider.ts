@@ -72,7 +72,11 @@ function buildPrompt(question: string, answer: string) {
   return `${WRITING_INSTRUCTIONS}\n\nPergunta:\n${question}\n\nResposta:\n${answer}`;
 }
 
-async function requestOpenAI(input: string, instructions: string, maxTokens: number): Promise<string> {
+async function requestOpenAI(
+  input: string,
+  instructions: string,
+  maxTokens: number,
+): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY não configurada");
 
@@ -80,27 +84,33 @@ async function requestOpenAI(input: string, instructions: string, maxTokens: num
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({
       model: process.env.OPENAI_MODEL || "gpt-5.4-mini",
       instructions,
       input,
-      max_output_tokens: maxTokens
+      max_output_tokens: maxTokens,
     }),
-    signal: AbortSignal.timeout(30_000)
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!response.ok) throw new Error(`OpenAI retornou HTTP ${response.status}`);
   const data: any = await response.json();
-  const text = data.output_text || data.output
-    ?.flatMap((item: any) => item.content || [])
-    .find((item: any) => item.type === "output_text")?.text;
+  const text =
+    data.output_text ||
+    data.output
+      ?.flatMap((item: any) => item.content || [])
+      .find((item: any) => item.type === "output_text")?.text;
   if (!text?.trim()) throw new Error("OpenAI não retornou texto");
   return text.trim();
 }
 
-async function requestGemini(input: string, instructions: string, maxTokens: number): Promise<string> {
+async function requestGemini(
+  input: string,
+  instructions: string,
+  maxTokens: number,
+): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY não configurada");
 
@@ -108,14 +118,18 @@ async function requestGemini(input: string, instructions: string, maxTokens: num
   const response = await ai.models.generateContent({
     model: process.env.GEMINI_MODEL || "gemini-3.5-flash",
     contents: `${instructions}\n\n${input}`,
-    config: { maxOutputTokens: maxTokens, temperature: 0.2 }
+    config: { maxOutputTokens: maxTokens, temperature: 0.2 },
   });
   const text = response.text;
   if (!text?.trim()) throw new Error("Gemini não retornou texto");
   return text.trim();
 }
 
-function buildProviderStatus(provider: string, model: string, configured: boolean) {
+function buildProviderStatus(
+  provider: string,
+  model: string,
+  configured: boolean,
+) {
   return { provider, model, configured };
 }
 
@@ -125,19 +139,31 @@ export function getAiProviderStatus() {
     return buildProviderStatus(
       "gemini_openai",
       `${process.env.GEMINI_MODEL || "gemini-3.5-flash"} -> ${process.env.OPENAI_MODEL || "gpt-5.4-mini"}`,
-      Boolean(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY)
+      Boolean(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY),
     );
   }
   if (provider === "openai") {
-    return buildProviderStatus(provider, process.env.OPENAI_MODEL || "gpt-5.4-mini", Boolean(process.env.OPENAI_API_KEY));
+    return buildProviderStatus(
+      provider,
+      process.env.OPENAI_MODEL || "gpt-5.4-mini",
+      Boolean(process.env.OPENAI_API_KEY),
+    );
   }
   if (provider === "gemini") {
-    return buildProviderStatus(provider, process.env.GEMINI_MODEL || "gemini-3.5-flash", Boolean(process.env.GEMINI_API_KEY));
+    return buildProviderStatus(
+      provider,
+      process.env.GEMINI_MODEL || "gemini-3.5-flash",
+      Boolean(process.env.GEMINI_API_KEY),
+    );
   }
   return buildProviderStatus(provider, "", false);
 }
 
-async function generateWithProvider(input: string, instructions: string, maxTokens: number): Promise<string> {
+async function generateWithProvider(
+  input: string,
+  instructions: string,
+  maxTokens: number,
+): Promise<string> {
   const { provider } = getAiProviderStatus();
   if (provider === "gemini_openai") {
     if (process.env.GEMINI_API_KEY) {
@@ -152,15 +178,26 @@ async function generateWithProvider(input: string, instructions: string, maxToke
     }
     throw new Error("Nenhum provedor de IA configurado");
   }
-  if (provider === "openai") return requestOpenAI(input, instructions, maxTokens);
-  if (provider === "gemini") return requestGemini(input, instructions, maxTokens);
+  if (provider === "openai")
+    return requestOpenAI(input, instructions, maxTokens);
+  if (provider === "gemini")
+    return requestGemini(input, instructions, maxTokens);
   throw new Error("AI_PROVIDER inválido");
 }
 
-export async function improveAnswer(question: string, answer: string): Promise<string> {
-  return generateWithProvider(`Pergunta:\n${question}\n\nResposta:\n${answer}`, WRITING_INSTRUCTIONS, 600);
+export async function improveAnswer(
+  question: string,
+  answer: string,
+): Promise<string> {
+  return generateWithProvider(
+    `Pergunta:\n${question}\n\nResposta:\n${answer}`,
+    WRITING_INSTRUCTIONS,
+    600,
+  );
 }
 
-export async function generateStructuredResponse(input: string): Promise<string> {
+export async function generateStructuredResponse(
+  input: string,
+): Promise<string> {
   return generateWithProvider(input, REPORT_INSTRUCTIONS, 1200);
 }

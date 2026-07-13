@@ -10,7 +10,10 @@ const {
   buildPlaceholderInsight,
 } = await import("../server");
 
-type QuestionId = "principal_aprendizado" | "pratica_pretende_aplicar" | "recomendacao_estrategica_ren";
+type QuestionId =
+  | "principal_aprendizado"
+  | "pratica_pretende_aplicar"
+  | "recomendacao_estrategica_ren";
 type CachedInsight = Awaited<ReturnType<typeof buildPlaceholderInsight>>;
 
 type Submission = {
@@ -89,7 +92,12 @@ test("Cenário 1: 0 respostas não reutiliza análise antiga e não chama IA", a
   const { deps, calls, saved } = makeDeps();
   const existing: Record<string, CachedInsight> = {
     [questionId]: {
-      ...buildPlaceholderInsight(questionId, 2, "old-fingerprint", "2026-07-12T12:00:00.000Z"),
+      ...buildPlaceholderInsight(
+        questionId,
+        2,
+        "old-fingerprint",
+        "2026-07-12T12:00:00.000Z",
+      ),
       status: "atualizado" as const,
       resumo: "Análise antiga",
       principaisTemas: ["Tema antigo"],
@@ -158,7 +166,10 @@ test("Cenário 4: resposta alterada muda fingerprint e gera nova análise", asyn
 test("Cenário 5: segunda resposta adicionada força nova análise", async () => {
   const questionId: QuestionId = "principal_aprendizado";
   const one = [makeSubmission("r1", "Primeira resposta")];
-  const two = [makeSubmission("r1", "Primeira resposta"), makeSubmission("r2", "Segunda resposta")];
+  const two = [
+    makeSubmission("r1", "Primeira resposta"),
+    makeSubmission("r2", "Segunda resposta"),
+  ];
   const oneState = getRelevantResponseState(questionId, one);
   const existing: Record<string, CachedInsight> = {
     [questionId]: makeUpdatedInsight(questionId, oneState),
@@ -189,7 +200,10 @@ test("Cenário 6: múltiplos refresh sem mudança não chamam IA novamente", asy
 
 test("Cenário 7: exclusão parcial muda fingerprint e gera nova análise", async () => {
   const questionId: QuestionId = "principal_aprendizado";
-  const two = [makeSubmission("r1", "Primeira"), makeSubmission("r2", "Segunda")];
+  const two = [
+    makeSubmission("r1", "Primeira"),
+    makeSubmission("r2", "Segunda"),
+  ];
   const one = [makeSubmission("r1", "Primeira")];
   const stateTwo = getRelevantResponseState(questionId, two);
   const existing: Record<string, CachedInsight> = {
@@ -208,7 +222,12 @@ test("Cenário 8: todas respostas excluídas substitui insight antigo por placeh
   const submissions: Submission[] = [];
   const existing: Record<string, CachedInsight> = {
     [questionId]: {
-      ...buildPlaceholderInsight(questionId, 2, "fingerprint-antigo", "2026-07-12T12:00:00.000Z"),
+      ...buildPlaceholderInsight(
+        questionId,
+        2,
+        "fingerprint-antigo",
+        "2026-07-12T12:00:00.000Z",
+      ),
       status: "atualizado" as const,
       resumo: "Resumo antigo",
       principaisTemas: ["Tema antigo"],

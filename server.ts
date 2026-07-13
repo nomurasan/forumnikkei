@@ -889,12 +889,10 @@ app.post("/api/ai/improve", async (req, res) => {
     (timestamp) => now - timestamp < AI_RATE_LIMIT_WINDOW_MS,
   );
   if (recentRequests.length >= AI_RATE_LIMIT_MAX_REQUESTS) {
-    return res
-      .status(429)
-      .json({
-        message:
-          "Limite de aprimoramentos atingido. Tente novamente em alguns instantes.",
-      });
+    return res.status(429).json({
+      message:
+        "Limite de aprimoramentos atingido. Tente novamente em alguns instantes.",
+    });
   }
   recentRequests.push(now);
   aiRequestsByIp.set(clientIp, recentRequests);
@@ -918,12 +916,10 @@ app.post("/api/ai/improve", async (req, res) => {
 
   const providerStatus = getAiProviderStatus();
   if (!providerStatus.configured) {
-    return res
-      .status(503)
-      .json({
-        code: "AI_NOT_CONFIGURED",
-        message: "O assistente de IA ainda não foi configurado no servidor.",
-      });
+    return res.status(503).json({
+      code: "AI_NOT_CONFIGURED",
+      message: "O assistente de IA ainda não foi configurado no servidor.",
+    });
   }
 
   try {
@@ -939,13 +935,11 @@ app.post("/api/ai/improve", async (req, res) => {
     console.error(
       `[AI] provider=${providerStatus.provider} model=${providerStatus.model} code=${code}`,
     );
-    return res
-      .status(503)
-      .json({
-        code: "AI_PROVIDER_UNAVAILABLE",
-        message:
-          "Não foi possível aprimorar sua resposta. Tente novamente em alguns instantes.",
-      });
+    return res.status(503).json({
+      code: "AI_PROVIDER_UNAVAILABLE",
+      message:
+        "Não foi possível aprimorar sua resposta. Tente novamente em alguns instantes.",
+    });
   }
 });
 
@@ -964,12 +958,10 @@ app.post("/api/respostas", async (req, res) => {
     selectedInitiatives.length === 0 ||
     !normalizeString(data.recomendacaoEstrategicaREN)
   ) {
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "Por favor, responda todas as seis perguntas antes de enviar.",
-      });
+    return res.status(400).json({
+      success: false,
+      message: "Por favor, responda todas as seis perguntas antes de enviar.",
+    });
   }
   if (activity === "Outro" && !activityOther) {
     return res
@@ -977,12 +969,10 @@ app.post("/api/respostas", async (req, res) => {
       .json({ success: false, message: "Informe qual foi a outra atividade." });
   }
   if (selectedInitiatives.includes("Outro") && !initiativeOther) {
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "Informe qual é a outra iniciativa prioritária.",
-      });
+    return res.status(400).json({
+      success: false,
+      message: "Informe qual é a outra iniciativa prioritária.",
+    });
   }
 
   try {
