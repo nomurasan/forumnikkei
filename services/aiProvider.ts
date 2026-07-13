@@ -58,14 +58,27 @@ Regras obrigatórias:
 11. Agrupe ideias semanticamente semelhantes, mesmo quando utilizarem palavras diferentes.
 12. Não acrescente elogios promocionais à REN Brasil, à Toyota, ao evento ou às organizações participantes.
 13. Use linguagem objetiva, profissional, institucional e acessível.
-14. O resumo deve ser proporcional à quantidade e à riqueza das respostas.
-15. Para uma única resposta, produza um resumo entre 50 e 110 palavras.
-16. Para várias respostas, produza um resumo entre 90 e 180 palavras.
-17. Cada item de lista deve ser curto, específico e sustentado pelas respostas.
-18. Quando não houver conteúdo suficiente para determinado campo, retorne uma lista vazia.
-19. Não use Markdown.
-20. Não escreva explicações antes ou depois da estrutura solicitada.
-21. Retorne exclusivamente JSON válido.
+14. Escreva exclusivamente em português do Brasil.
+15. Utilize apenas caracteres do alfabeto latino, números, acentos e pontuação usuais da língua portuguesa.
+16. Preserve acentuação do português do Brasil (por exemplo: á, à, â, ã, é, ê, í, ó, ô, õ, ú, ç).
+17. Não use caracteres de outros sistemas de escrita, incluindo devanágari, cirílico, árabe, hebraico, chinês, japonês, coreano, tailandês ou outros alfabetos não latinos.
+18. Não misture alfabetos diferentes dentro de uma palavra. Exemplo proibido: "परिणामados".
+19. Antes de responder, revise internamente se todo o texto está corretamente escrito em português do Brasil e sem caracteres estranhos.
+20. Não remova acentos e não converta o texto para ASCII.
+21. Não invente fatos, contextos, causas, resultados, benefícios, recomendações, intenções, exemplos, relações causais ou conclusões não sustentadas pelas respostas.
+22. Pode sintetizar e reorganizar, mas sem ampliar o significado original das respostas.
+23. Evite transformar parágrafos longos em itens de lista; cada item deve representar preferencialmente uma única ideia principal.
+24. Não preencha campos apenas para completar a estrutura; quando não houver base nas respostas, retorne lista vazia.
+25. Para uma única resposta, use síntese direta e concisa, sem ampliação artificial do conteúdo.
+26. Para múltiplas respostas, consolide padrões, convergências, diferenças e contribuições pontuais.
+27. Não use Markdown.
+28. Não escreva explicações antes ou depois da estrutura solicitada.
+29. Retorne exclusivamente JSON válido.
+30. O resumo deve ser proporcional à quantidade e à riqueza das respostas.
+31. Para uma única resposta, produza um resumo entre 50 e 110 palavras.
+32. Para várias respostas, produza um resumo entre 90 e 180 palavras.
+33. Cada item de lista deve ser curto, específico e sustentado pelas respostas.
+34. Quando não houver conteúdo suficiente para determinado campo, retorne uma lista vazia.
 `;
 
 function buildPrompt(question: string, answer: string) {

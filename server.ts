@@ -497,6 +497,13 @@ Retorne "principaisTemas" e "oportunidades" como listas vazias.`
         : `Preencha "oportunidades".
 Retorne "principaisTemas" e "aplicacoesPraticas" como listas vazias.`;
 
+  const questionFocus =
+    questionId === "principal_aprendizado"
+      ? "Priorize aprendizados e temas mencionados."
+      : questionId === "pratica_pretende_aplicar"
+        ? "Priorize práticas, ações, iniciativas ou mudanças que pretendem implementar."
+        : "Priorize oportunidades, temas, iniciativas e sugestões para a programação futura da REN Brasil.";
+
   return `
 Pergunta analisada:
 ${config.pergunta}
@@ -525,6 +532,23 @@ Identifique convergências, diferenças e contribuições pontuais sem generaliz
 
 Campo principal desta pergunta:
 ${fieldInstruction}
+
+Foco específico desta pergunta:
+${questionFocus}
+
+Regras linguísticas obrigatórias:
+- Escreva exclusivamente em português do Brasil.
+- Preserve acentuação normal da língua portuguesa (á, à, â, ã, é, ê, í, ó, ô, õ, ú, ç).
+- Use somente alfabeto latino, números e pontuação usuais do português.
+- Não use caracteres de outros sistemas de escrita (devanágari, cirílico, árabe, hebraico, chinês, japonês, coreano, tailandês ou equivalentes).
+- Não misture alfabetos em uma palavra. Exemplo proibido: "परिणामados".
+- Antes de responder, revise internamente o texto para garantir que não há caracteres estranhos.
+
+Restrições adicionais:
+- Não invente fatos, contextos, causas, resultados, benefícios, recomendações, intenções, exemplos ou conclusões não sustentadas.
+- Não transforme uma contribuição isolada em percepção coletiva.
+- Cada item de lista deve ser curto, objetivo, específico e representar preferencialmente uma única ideia.
+- Não preencha campos sem base nas respostas; quando faltar conteúdo, retorne lista vazia.
 
 Retorne exatamente esta estrutura:
 
