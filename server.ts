@@ -475,24 +475,72 @@ function truncate(text: string, limit = 260): string {
     : compact;
 }
 
-function buildPromptForQuestion(questionId: QuestionId, responses: string[]) {
+function buildPromptForQuestion(
+  questionId: QuestionId,
+  responses: string[],
+  totalResponses: number,
+) {
   const config = QUESTION_CONFIGS[questionId];
-  return `Pergunta analisada:
+
+  const analysisMode =
+    totalResponses === 1
+      ? "Análise de uma contribuição individual"
+      : "Análise consolidada de múltiplas respostas";
+
+  const fieldInstruction =
+    questionId === "principal_aprendizado"
+      ? `Preencha "principaisTemas".
+Retorne "aplicacoesPraticas" e "oportunidades" como listas vazias.`
+      : questionId === "pratica_pretende_aplicar"
+        ? `Preencha "aplicacoesPraticas".
+Retorne "principaisTemas" e "oportunidades" como listas vazias.`
+        : `Preencha "oportunidades".
+Retorne "principaisTemas" e "aplicacoesPraticas" como listas vazias.`;
+
+  return `
+Pergunta analisada:
 ${config.pergunta}
 
-Quantidade de respostas:
+Modo da análise:
+${analysisMode}
+
+Quantidade total de respostas válidas:
+${totalResponses}
+
+Quantidade de respostas incluídas no contexto:
 ${responses.length}
 
-Respostas:
+Respostas anonimizadas:
 ${responses.map((item, index) => `${index + 1}. ${item}`).join("\n")}
 
-Formato obrigatório:
+Orientação conforme a quantidade:
+${
+  totalResponses === 1
+    ? `Existe somente uma resposta.
+Faça uma síntese individual neutra.
+Não apresente consenso, recorrência, padrão coletivo ou opinião dos participantes.`
+    : `Existem várias respostas.
+Identifique convergências, diferenças e contribuições pontuais sem generalizações indevidas.`
+}
+
+Campo principal desta pergunta:
+${fieldInstruction}
+
+Retorne exatamente esta estrutura:
+
 {
-  "resumo": "Síntese dos principais insights.",
-  "principaisTemas": ["Tema 1", "Tema 2"],
-  "aplicacoesPraticas": ["Aplicação 1"],
-  "oportunidades": ["Oportunidade 1"]
-}`;
+  "resumo": "Síntese executiva fiel às respostas fornecidas.",
+  "principaisTemas": [
+    "Tema ou aprendizado identificado"
+  ],
+  "aplicacoesPraticas": [
+    "Aplicação prática mencionada"
+  ],
+  "oportunidades": [
+    "Oportunidade ou sugestão mencionada"
+  ]
+}
+`.trim();
 }
 
 function parseJsonResponse(raw: string) {
@@ -535,19 +583,25 @@ function buildInsightFromParsed(
 function buildPlaceholderInsight(
   questionId: QuestionId,
   quantidade: number,
+  responsesFingerprint?: string,
+  latestResponseAt?: string | null,
 ): CachedInsight {
   return {
     questionId,
     pergunta: QUESTION_CONFIGS[questionId].pergunta,
     resumo:
-      "Ainda não há respostas suficientes para gerar uma análise consolidada.",
+      quantidade === 0
+        ? "Ainda não há respostas para gerar uma análise."
+        : "A análise ainda não foi gerada.",
     principaisTemas: [],
     aplicacoesPraticas: [],
     oportunidades: [],
     quantidadeRespostasAnalisadas: quantidade,
     status: "desatualizado",
-    updatedAt: null,
+    updatedAt: new Date().toISOString(),
     modelo: getAiProviderStatus().model || "",
+    responsesFingerprint,
+    latestResponseAt: latestResponseAt || null,
   };
 }
 
@@ -556,8 +610,23 @@ function getCachedInsightForQuestion(
   submissions: Submission[],
   cache: Record<string, CachedInsight>,
 ): CachedInsight {
+  const responseState = getRelevantResponseState(questionId, submissions);
+
+  if (responseState.count === 0) {
+    return buildPlaceholderInsight(
+      questionId,
+      0,
+      responseState.fingerprint,
+      responseState.latestResponseAt,
+    );
+  }
+
   const existing = cache[questionId];
-  if (existing) {
+  if (
+    existing &&
+    existing.responsesFingerprint === responseState.fingerprint &&
+    existing.status === "atualizado"
+  ) {
     return {
       ...existing,
       principaisTemas:
@@ -573,8 +642,12 @@ function getCachedInsightForQuestion(
     };
   }
 
-  const responseState = getRelevantResponseState(questionId, submissions);
-  return buildPlaceholderInsight(questionId, responseState.count);
+  return buildPlaceholderInsight(
+    questionId,
+    responseState.count,
+    responseState.fingerprint,
+    responseState.latestResponseAt,
+  );
 }
 function getRelevantResponseState(
   questionId: QuestionId,
@@ -621,6 +694,7 @@ async function generateInsight(
   const prompt = buildPromptForQuestion(
     questionId,
     responseState.promptResponses,
+    responseState.count,
   );
   const raw = await generateStructuredResponse(prompt);
   const parsed = parseJsonResponse(raw);
@@ -633,13 +707,40 @@ async function generateInsight(
   );
 }
 
+type EnsureInsightDeps = {
+  generateInsightFn: typeof generateInsight;
+  saveInsightCacheFn: typeof saveInsightCache;
+  generationMap: Map<QuestionId, Promise<CachedInsight>>;
+};
+
+const defaultEnsureInsightDeps: EnsureInsightDeps = {
+  generateInsightFn: generateInsight,
+  saveInsightCacheFn: saveInsightCache,
+  generationMap: insightGenerationByQuestion,
+};
+
 async function ensureInsight(
   questionId: QuestionId,
   submissions: Submission[],
   cache: Record<string, CachedInsight>,
+  deps: EnsureInsightDeps = defaultEnsureInsightDeps,
 ): Promise<CachedInsight> {
   const existing = cache[questionId];
   const responseState = getRelevantResponseState(questionId, submissions);
+
+  if (responseState.count === 0) {
+    const placeholder = buildPlaceholderInsight(
+      questionId,
+      0,
+      responseState.fingerprint,
+      responseState.latestResponseAt,
+    );
+
+    await deps.saveInsightCacheFn(placeholder);
+
+    return placeholder;
+  }
+
   if (
     existing &&
     existing.responsesFingerprint === responseState.fingerprint &&
@@ -648,25 +749,21 @@ async function ensureInsight(
     return existing;
   }
 
-  if (responseState.count < 3) {
-    return existing || buildPlaceholderInsight(questionId, responseState.count);
-  }
-
-  const generationInProgress = insightGenerationByQuestion.get(questionId);
+  const generationInProgress = deps.generationMap.get(questionId);
   if (generationInProgress) return generationInProgress;
 
   const generation = (async () => {
-    const insight = await generateInsight(questionId, responseState);
-    await saveInsightCache(insight);
+    const insight = await deps.generateInsightFn(questionId, responseState);
+    await deps.saveInsightCacheFn(insight);
     return insight;
   })();
-  insightGenerationByQuestion.set(questionId, generation);
+  deps.generationMap.set(questionId, generation);
 
   try {
     return await generation;
   } finally {
-    if (insightGenerationByQuestion.get(questionId) === generation) {
-      insightGenerationByQuestion.delete(questionId);
+    if (deps.generationMap.get(questionId) === generation) {
+      deps.generationMap.delete(questionId);
     }
   }
 }
@@ -1009,4 +1106,17 @@ async function startServer() {
   });
 }
 
-startServer().catch((err) => console.error("Falha ao iniciar servidor:", err));
+if (process.env.NODE_ENV !== "test") {
+  startServer().catch((err) =>
+    console.error("Falha ao iniciar servidor:", err),
+  );
+}
+
+export {
+  buildPlaceholderInsight,
+  buildPromptForQuestion,
+  ensureInsight,
+  getCachedInsightForQuestion,
+  getRelevantResponseState,
+};
+export type { CachedInsight, QuestionId, Submission };

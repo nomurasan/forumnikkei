@@ -34,17 +34,17 @@ interface PublicReportProps {
 const QUESTION_DETAILS: Record<string, { title: string; subtitle: string; highlightLabel: string }> = {
   principal_aprendizado: {
     title: "Qual foi o principal aprendizado que você leva deste Fórum e como ele pode contribuir para o desenvolvimento da sua empresa ou organização?",
-    subtitle: "Resumo consolidado dos aprendizados mais recorrentes e dos temas que apareceram com mais força.",
+    subtitle: "Síntese dos aprendizados identificados nas respostas recebidas.",
     highlightLabel: "Principais temas"
   },
   pratica_pretende_aplicar: {
     title: "Caso pretenda aplicar algum aprendizado, qual prática ou iniciativa você pretende implementar em sua empresa ou organização?",
-    subtitle: "Síntese das práticas mais citadas e das aplicações concretas mencionadas pelos participantes.",
+    subtitle: "Síntese das práticas e iniciativas mencionadas nas respostas recebidas.",
     highlightLabel: "Aplicações práticas"
   },
   recomendacao_estrategica_ren: {
     title: "Que tema ou iniciativa você gostaria de ver na programação da REN Brasil para apoiar o fortalecimento das empresas nikkeis?",
-    subtitle: "Leitura consolidada das oportunidades e sugestões recorrentes para a programação futura.",
+    subtitle: "Síntese das oportunidades e sugestões apresentadas nas respostas recebidas.",
     highlightLabel: "Oportunidades"
   }
 };
@@ -87,7 +87,7 @@ function SectionCard({ title, children, kicker }: { title: string; children: Rea
 function InsightCard({ insight }: { insight: QuestionInsights }) {
   const detail = QUESTION_DETAILS[insight.questionId] || {
     title: insight.pergunta,
-    subtitle: "Resumo consolidado dos resultados",
+    subtitle: "Síntese dos resultados recebidos",
     highlightLabel: "Destaques"
   };
 
@@ -231,8 +231,8 @@ export default function PublicReport({ onBackToQuestionnaire }: PublicReportProp
 
   const reportStatusMessage = useMemo(() => {
     if (!report) return "";
-    if (!hasInsights || totalRespostas < 3) {
-      return "Ainda não há respostas suficientes para gerar uma análise consolidada.";
+    if (!hasInsights || totalRespostas === 0) {
+      return "Ainda não há respostas para gerar uma análise.";
     }
     return "";
   }, [hasInsights, report, totalRespostas]);
@@ -361,7 +361,7 @@ export default function PublicReport({ onBackToQuestionnaire }: PublicReportProp
               <p className="text-[10px] font-mono font-bold uppercase tracking-[0.28em] text-brand-red/70">Principais aprendizados e insights</p>
               <h2 className="mt-1 text-2xl font-black tracking-tight text-neutral-900">Cada pergunta aberta consolidada em um card</h2>
               <p className="mt-2 max-w-3xl text-sm leading-relaxed text-neutral-600">
-                As respostas individuais permanecem ocultas. A leitura abaixo destaca os padrões recorrentes, os temas mais frequentes e as oportunidades identificadas pela análise.
+                As respostas individuais permanecem ocultas. A leitura abaixo destaca os aprendizados, práticas e oportunidades identificados nas respostas recebidas.
               </p>
             </div>
             <div className="flex flex-col items-stretch gap-2 sm:items-end">

@@ -18,23 +18,55 @@ Regras obrigatórias:
 - Não faça comentários sobre o processo de revisão.
 - Retorne somente o texto final aprimorado.`;
 
-const REPORT_INSTRUCTIONS = `Você é um analista responsável por consolidar os resultados do questionário do Fórum Empresarial Nikkei Brasil-Japão.
+const REPORT_INSTRUCTIONS = `
+Você é um analista responsável por transformar respostas abertas do questionário do Fórum Empresarial Nikkei Brasil-Japão em uma síntese executiva.
 
-Analise as respostas fornecidas para uma única pergunta aberta.
+Analise exclusivamente as respostas fornecidas para uma única pergunta.
 
-Seu objetivo é identificar padrões recorrentes, aprendizados, necessidades, oportunidades e recomendações presentes nas respostas.
+A análise pode conter somente uma resposta ou várias respostas. Adapte a linguagem à quantidade de respostas recebidas.
+
+Objetivos:
+- sintetizar os principais aprendizados, intenções, necessidades, sugestões ou oportunidades presentes nas respostas;
+- organizar as informações de forma objetiva e útil para um relatório executivo;
+- identificar temas semelhantes quando houver mais de uma resposta;
+- apresentar uma contribuição individual de forma neutra quando houver apenas uma resposta.
 
 Regras obrigatórias:
+
 1. Não identifique participantes.
-2. Não reproduza respostas individuais completas.
-3. Não invente informações.
-4. Não atribua uma opinião à totalidade dos participantes quando ela tiver sido mencionada por apenas uma pessoa.
-5. Diferencie temas recorrentes de contribuições pontuais.
-6. Use linguagem objetiva, profissional e institucional.
-7. Não faça elogios adicionais à REN Brasil, à Toyota ou ao evento.
-8. Não acrescente recomendações que não estejam sustentadas pelas respostas.
-9. Produza uma síntese adequada para um relatório executivo.
-10. Retorne exclusivamente JSON válido.`;
+2. Não mencione nomes, e-mails, empresas ou outros dados pessoais eventualmente presentes nas respostas.
+3. Não reproduza integralmente uma resposta individual.
+4. Não invente informações, exemplos, conclusões, resultados ou recomendações.
+5. Utilize somente informações sustentadas pelas respostas fornecidas.
+6. Quando houver apenas uma resposta, não use expressões como:
+  - "os participantes";
+  - "as respostas indicam";
+  - "houve consenso";
+  - "os temas mais recorrentes";
+  - "a maioria";
+  - "de forma recorrente".
+7. Quando houver apenas uma resposta, utilize construções neutras, como:
+  - "A resposta destaca...";
+  - "O relato aponta...";
+  - "A contribuição apresentada sugere...";
+8. Quando houver várias respostas, diferencie:
+  - temas recorrentes;
+  - contribuições menos frequentes;
+  - contribuições pontuais relevantes.
+9. Não trate uma contribuição isolada como opinião coletiva.
+10. Não apresente percentuais ou quantidades que não tenham sido fornecidos pelo sistema.
+11. Agrupe ideias semanticamente semelhantes, mesmo quando utilizarem palavras diferentes.
+12. Não acrescente elogios promocionais à REN Brasil, à Toyota, ao evento ou às organizações participantes.
+13. Use linguagem objetiva, profissional, institucional e acessível.
+14. O resumo deve ser proporcional à quantidade e à riqueza das respostas.
+15. Para uma única resposta, produza um resumo entre 50 e 110 palavras.
+16. Para várias respostas, produza um resumo entre 90 e 180 palavras.
+17. Cada item de lista deve ser curto, específico e sustentado pelas respostas.
+18. Quando não houver conteúdo suficiente para determinado campo, retorne uma lista vazia.
+19. Não use Markdown.
+20. Não escreva explicações antes ou depois da estrutura solicitada.
+21. Retorne exclusivamente JSON válido.
+`;
 
 function buildPrompt(question: string, answer: string) {
   return `${WRITING_INSTRUCTIONS}\n\nPergunta:\n${question}\n\nResposta:\n${answer}`;
