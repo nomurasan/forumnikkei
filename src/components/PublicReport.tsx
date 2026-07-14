@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   BarChart3,
   Clock3,
+  Download,
   RefreshCcw,
   Sparkles,
   Target,
@@ -208,6 +209,10 @@ export default function PublicReport({ onBackToQuestionnaire }: PublicReportProp
     }
   };
 
+  const handleDownloadCsv = () => {
+    window.open("/api/admin/respostas.csv", "_blank", "noopener,noreferrer");
+  };
+
   useEffect(() => {
     loadReport();
   }, []);
@@ -369,6 +374,14 @@ export default function PublicReport({ onBackToQuestionnaire }: PublicReportProp
                 <Brain className="h-3.5 w-3.5" />
                 Síntese por IA
               </div>
+              <button
+                type="button"
+                onClick={handleDownloadCsv}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-red/30 bg-white px-4 py-3 text-sm font-semibold text-brand-red transition hover:bg-brand-red/5"
+              >
+                <Download className="h-4 w-4" />
+                Baixar CSV de respostas
+              </button>
               <button
                 type="button"
                 onClick={handleRefreshReport}

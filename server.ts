@@ -273,6 +273,84 @@ function normalizeArray(value: unknown): string[] {
   return single ? [single] : [];
 }
 
+function toCsvCell(value: unknown): string {
+  if (value === null || value === undefined) return "";
+
+  let normalized: string;
+  if (Array.isArray(value)) {
+    normalized = value.map((item) => normalizeString(item)).join(" | ");
+  } else if (typeof value === "object") {
+    try {
+      normalized = JSON.stringify(value);
+    } catch {
+      normalized = String(value);
+    }
+  } else {
+    normalized = String(value);
+  }
+
+  // Escape quotes and wrap in quotes so commas/line breaks are preserved.
+  return `"${normalized.replace(/"/g, '""')}"`;
+}
+
+function buildCsvFromSubmissions(submissions: Submission[]): string {
+  const preferredColumns = [
+    "id",
+    "participanteId",
+    "eventoId",
+    "atividadeMaiorValor",
+    "atividadeMaiorValorOutro",
+    "principalAprendizado",
+    "principal_aprendizado_original",
+    "principal_aprendizado_final",
+    "principal_aprendizado_ia",
+    "probabilidadeAplicacao",
+    "praticaPretendeAplicar",
+    "pratica_pretende_aplicar_original",
+    "pratica_pretende_aplicar_final",
+    "pratica_pretende_aplicar_ia",
+    "iniciativaPrioritariaREN",
+    "iniciativaPrioritariaRENOutro",
+    "recomendacaoEstrategicaREN",
+    "recomendacao_estrategica_ren_original",
+    "recomendacao_estrategica_ren_final",
+    "recomendacao_estrategica_ren_ia",
+    "recomendacao_original",
+    "recomendacao_final",
+    "recomendacao_ia",
+    "createdAtLocal",
+    "updatedAtLocal",
+    "createdAt",
+    "updatedAt",
+    "origem",
+    "evento",
+  ];
+
+  const availableColumns = new Set<string>();
+  submissions.forEach((submission) => {
+    Object.keys(submission).forEach((key) => availableColumns.add(key));
+  });
+
+  const extraColumns = Array.from(availableColumns)
+    .filter((key) => !preferredColumns.includes(key))
+    .sort((a, b) => a.localeCompare(b));
+  const columns = [...preferredColumns, ...extraColumns].filter((key) =>
+    availableColumns.has(key),
+  );
+
+  if (!columns.length) {
+    columns.push(...preferredColumns);
+  }
+
+  const header = columns.map(toCsvCell).join(",");
+  const rows = submissions.map((submission) =>
+    columns.map((column) => toCsvCell(submission[column])).join(","),
+  );
+
+  // Include UTF-8 BOM to improve compatibility with Excel on Windows.
+  return `\uFEFF${[header, ...rows].join("\n")}`;
+}
+
 function uniqueStrings(values: string[]): string[] {
   return Array.from(new Set(values.map((item) => item.trim()).filter(Boolean)));
 }
@@ -1038,6 +1116,27 @@ app.get("/api/report", async (_req, res) => {
       message: isFirestoreConfigError(error)
         ? getFirestoreConfigMessage()
         : "Não foi possível carregar os resultados neste momento.",
+    });
+  }
+});
+
+app.get("/api/admin/respostas.csv", async (_req, res) => {
+  try {
+    const submissions = await readSubmissions();
+    const csv = buildCsvFromSubmissions(submissions);
+    const now = new Date();
+    const dateStamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+    const fileName = `forum_nikkei_respostas_${dateStamp}.csv`;
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename=\"${fileName}\"`);
+    return res.status(200).send(csv);
+  } catch (error) {
+    console.error("Erro ao exportar respostas em CSV:", error);
+    return res.status(isFirestoreConfigError(error) ? 503 : 500).json({
+      message: isFirestoreConfigError(error)
+        ? getFirestoreConfigMessage()
+        : "Não foi possível exportar o CSV neste momento.",
     });
   }
 });
