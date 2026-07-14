@@ -1129,7 +1129,10 @@ app.get("/api/admin/respostas.csv", async (_req, res) => {
     const fileName = `forum_nikkei_respostas_${dateStamp}.csv`;
 
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename=\"${fileName}\"`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=\"${fileName}\"`,
+    );
     return res.status(200).send(csv);
   } catch (error) {
     console.error("Erro ao exportar respostas em CSV:", error);
